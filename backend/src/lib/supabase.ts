@@ -1,44 +1,153 @@
-import { createClient } from "@supabase/supabase-js";
+import { localDb } from "./localDb";
+import { randomUUID } from "crypto";
 
 /**
- * Server-side Supabase client using the service role key.
- * Bypasses RLS — only use in API routes after verifying the user.
+ * Compatibility layer for Supabase calls, now using LocalDb.
  */
 export function createServerSupabase() {
-  const url = process.env.SUPABASE_URL || "";
-  const key = process.env.SUPABASE_SECRET_KEY || "";
-  if (!url || !key) {
-    throw new Error("SUPABASE_URL and SUPABASE_SECRET_KEY must be set");
-  }
-  return createClient(url, key, { auth: { persistSession: false } });
+  // Return a proxy that mimics the Supabase client
+  return {
+    from: (table: string) => {
+      return {
+        select: (query?: string) => {
+          return {
+            eq: (column: string, value: any) => {
+              return {
+                single: async () => {
+                  const items = await localDb.list<any>(table, (item) => item[column] === value);
+                  return { data: items[0] || null, error: null };
+                },
+                maybeSingle: async () => {
+                  const items = await localDb.list<any>(table, (item) => item[column] === value);
+                  return { data: items[0] || null, error: null };
+                },
+                order: (col: string, { ascending = true } = {}) => {
+                  return {
+                    then: async (resolve: any) => {
+                      const items = await localDb.list<any>(table, (item) => item[column] === value);
+                      items.sort((a, b) => ascending ? (a[col] > b[col] ? 1 : -1) : (a[col] < b[col] ? 1 : -1));
+                      resolve({ data: items, error: null });
+                    }
+                  };
+                },
+                async then(resolve: any) {
+                  const items = await localDb.list<any>(table, (item) => item[column] === value);
+                  resolve({ data: items, error: null });
+                }
+              };
+            },
+            match: (filter: Record<string, any>) => {
+               return {
+                 async then(resolve: any) {
+                   const items = await localDb.list<any>(table, (item) => {
+                     return Object.entries(filter).every(([k, v]) => item[k] === v);
+                   });
+                   resolve({ data: items, error: null });
+                 }
+               };
+            },
+            async then(resolve: any) {
+               const items = await localDb.list<any>(table);
+               resolve({ data: items, error: null });
+            }
+          };
+        },
+        insert: (data: any) => {
+          return {
+            select: () => {
+              return {
+                single: async () => {
+                  const item = Array.isArray(data) ? data[0] : data;
+                  if (!item.id) item.id = randomUUID();
+                  const saved = await localDb.upsert(table, item);
+                  return { data: saved, error: null };
+                },
+                async then(resolve: any) {
+                    const items = Array.isArray(data) ? data : [data];
+                    const saved = [];
+                    for (const item of items) {
+                         if (!item.id) item.id = randomUUID();
+                         saved.push(await localDb.upsert(table, item));
+                    }
+                    resolve({ data: saved, error: null });
+                }
+              };
+            },
+            async then(resolve: any) {
+                const items = Array.isArray(data) ? data : [data];
+                for (const item of items) {
+                     if (!item.id) item.id = randomUUID();
+                     await localDb.upsert(table, item);
+                }
+                resolve({ data: null, error: null });
+            }
+          };
+        },
+        upsert: (data: any) => {
+          return {
+            select: () => {
+              return {
+                single: async () => {
+                  const item = Array.isArray(data) ? data[0] : data;
+                  if (!item.id) item.id = randomUUID();
+                  const saved = await localDb.upsert(table, item);
+                  return { data: saved, error: null };
+                }
+              };
+            },
+            async then(resolve: any) {
+                const items = Array.isArray(data) ? data : [data];
+                for (const item of items) {
+                     if (!item.id) item.id = randomUUID();
+                     await localDb.upsert(table, item);
+                }
+                resolve({ data: null, error: null });
+            }
+          };
+        },
+        update: (data: any) => {
+          return {
+            eq: (column: string, value: any) => {
+              return {
+                async then(resolve: any) {
+                  const items = await localDb.list<any>(table, (item) => item[column] === value);
+                  for (const item of items) {
+                    await localDb.upsert(table, { ...item, ...data });
+                  }
+                  resolve({ data: null, error: null });
+                }
+              };
+            }
+          };
+        },
+        delete: () => {
+          return {
+            eq: (column: string, value: any) => {
+              return {
+                async then(resolve: any) {
+                  const items = await localDb.list<any>(table, (item) => item[column] === value);
+                  for (const item of items) {
+                    await localDb.delete(table, item.id);
+                  }
+                  resolve({ data: null, error: null });
+                }
+              };
+            }
+          };
+        }
+      };
+    },
+    auth: {
+      getUser: async (token: string) => {
+        return { data: { user: { id: "default-user" } }, error: null };
+      }
+    }
+  } as any;
 }
 
 /**
- * Extract and verify the Supabase JWT from the Authorization header.
- * Returns the user's UUID string, or throws a Response with 401.
+ * Return a default user ID for the single-user Space environment.
  */
 export async function getUserIdFromRequest(req: Request): Promise<string> {
-  const auth = req.headers.get("authorization") ?? "";
-  if (!auth.startsWith("Bearer ")) {
-    throw new Response("Missing or invalid Authorization header", {
-      status: 401,
-    });
-  }
-  const token = auth.slice(7).trim();
-
-  const supabaseUrl = process.env.SUPABASE_URL || "";
-  const serviceKey = process.env.SUPABASE_SECRET_KEY || "";
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Response("Server auth is not configured", { status: 500 });
-  }
-
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false },
-  });
-  const { data } = await admin.auth.getUser(token);
-  if (!data.user) {
-    throw new Response("Invalid or expired token", { status: 401 });
-  }
-  return data.user.id;
+  return "default-user";
 }
