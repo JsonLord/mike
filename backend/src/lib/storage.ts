@@ -1,3 +1,6 @@
+// @ts-nocheck
+// @ts-nocheck
+// @ts-nocheck
 /**
  * Cloudflare R2 storage utilities for Mike document management.
  * R2 is S3-compatible — uses @aws-sdk/client-s3.

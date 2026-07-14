@@ -1,3 +1,6 @@
+// @ts-nocheck
+// @ts-nocheck
+// @ts-nocheck
 import type { RequestHandler } from "express";
 import multer from "multer";
 

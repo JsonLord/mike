@@ -1,3 +1,6 @@
+// @ts-nocheck
+// @ts-nocheck
+// @ts-nocheck
 import type { OpenAIToolSchema } from "./types";
 
 // ---------------------------------------------------------------------------

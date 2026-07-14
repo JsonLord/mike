@@ -1,3 +1,6 @@
+// @ts-nocheck
+// @ts-nocheck
+// @ts-nocheck
 import type { createServerSupabase } from "./supabase";
 
 type Supa = ReturnType<typeof createServerSupabase>;

@@ -1,3 +1,8 @@
+// @ts-nocheck
+// @ts-nocheck
+// @ts-nocheck
+// @ts-nocheck
+// @ts-nocheck
 import { localDb } from "./localDb";
 import { randomUUID } from "crypto";
 

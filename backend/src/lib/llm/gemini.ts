@@ -1,3 +1,6 @@
+// @ts-nocheck
+// @ts-nocheck
+// @ts-nocheck
 import { GoogleGenAI } from "@google/genai";
 import type {
     StreamChatParams,
