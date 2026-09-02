@@ -15,15 +15,30 @@ const DEFAULT_OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const MAX_OUTPUT_TOKENS = 16384;
 
 function getEndpoint(): string {
-    return process.env.OPENAI_URL || DEFAULT_OPENAI_URL;
+    let url = process.env.OPENAI_URL || process.env.OPENAI_BASE_URL || process.env.OPENAI_API_BASE || DEFAULT_OPENAI_URL;
+    url = url.trim();
+    if (!url.endsWith("/chat/completions") && !url.endsWith("/chat/completions/")) {
+        if (url.endsWith("/")) {
+            url = url + "chat/completions";
+        } else {
+            url = url + "/chat/completions";
+        }
+    }
+    return url;
 }
 
 function getModel(override?: string): string {
-    return override || process.env.OPENAI_MODEL || "gpt-4o";
+    return process.env.OPENAI_MODEL?.trim() || override?.trim() || "gpt-4o";
 }
 
 function apiKey(override?: string | null): string {
-    const key = override?.trim() || process.env.OPENAI_KEY?.trim() || process.env.OPENAI_API_KEY?.trim() || "";
+    const key =
+        override?.trim() ||
+        process.env.OPENAI_KEY?.trim() ||
+        process.env.OPENAI_API_KEY?.trim() ||
+        process.env.OPENAI_TOKEN?.trim() ||
+        process.env.OPENAI_API_TOKEN?.trim() ||
+        "";
     if (!key) {
         throw new Error(
             "OpenAI API key is not configured. Set OPENAI_KEY or OPENAI_API_KEY.",
