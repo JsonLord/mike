@@ -5,7 +5,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import { createServerSupabase } from "../lib/supabase";
-import { DEFAULT_TABULAR_MODEL, resolveModel } from "../lib/llm";
+import { defaultTabularModel, resolveModel } from "../lib/llm";
 import {
   type ApiKeyStatus,
   getUserApiKeyStatus,
@@ -39,7 +39,7 @@ function serializeProfile(
     creditsResetDate: row.credits_reset_date,
     creditsRemaining: Math.max(MONTHLY_CREDIT_LIMIT - creditsUsed, 0),
     tier: row.tier || "Free",
-    tabularModel: resolveModel(row.tabular_model, DEFAULT_TABULAR_MODEL),
+    tabularModel: resolveModel(row.tabular_model, defaultTabularModel()),
     ...(apiKeyStatus ? { apiKeyStatus } : {}),
   };
 }

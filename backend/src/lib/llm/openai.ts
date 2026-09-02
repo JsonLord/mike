@@ -7,46 +7,29 @@ import type {
     StreamChatParams,
     StreamChatResult,
 } from "./types";
+import {
+    openAiApiKey,
+    openAiChatCompletionsEndpoint,
+    openAiCompatibleModel,
+    openAiCompatibleModelId,
+} from "./openaiCompatible";
 
-const DEFAULT_OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const MAX_OUTPUT_TOKENS = 16384;
 
 function getEndpoint(): string {
-    let url =
-        process.env.OPENAI_COMPATIBLE_URL ||
-        process.env.OPENAI_URL ||
-        process.env.OPENAI_BASE_URL ||
-        process.env.OPENAI_API_BASE ||
-        DEFAULT_OPENAI_URL;
-    url = url.trim();
-    if (!url.endsWith("/chat/completions") && !url.endsWith("/chat/completions/")) {
-        if (url.endsWith("/")) {
-            url = url + "chat/completions";
-        } else {
-            url = url + "/chat/completions";
-        }
-    }
-    return url;
+    return openAiChatCompletionsEndpoint();
 }
 
 function getModel(override?: string): string {
-    return (
-        override?.trim() ||
-        process.env.OPENAI_COMPATIBLE_MODEL?.trim() ||
-        process.env.OPENAI_MODEL?.trim() ||
-        "gpt-4o"
-    );
+    // A custom OpenAI-compatible endpoint serves exactly the model it was
+    // configured with, so that model wins over whatever the client selected.
+    const configured = openAiCompatibleModelId();
+    if (configured) return configured;
+    return override?.trim() || openAiCompatibleModel() || "gpt-4o";
 }
 
 function apiKey(override?: string | null): string {
-    const key =
-        override?.trim() ||
-        process.env.OPENAI_COMPATIBLE_API?.trim() ||
-        process.env.OPENAI_KEY?.trim() ||
-        process.env.OPENAI_API_KEY?.trim() ||
-        process.env.OPENAI_TOKEN?.trim() ||
-        process.env.OPENAI_API_TOKEN?.trim() ||
-        "";
+    const key = override?.trim() || openAiApiKey() || "";
     if (!key) {
         throw new Error(
             "OpenAI API key is not configured. Set OPENAI_COMPATIBLE_API, OPENAI_KEY or OPENAI_API_KEY.",

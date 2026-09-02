@@ -24,7 +24,7 @@ import {
 import {
     streamChatWithTools,
     resolveModel,
-    DEFAULT_MAIN_MODEL,
+    defaultMainModel,
     type LlmMessage,
     type OpenAIToolSchema,
 } from "./llm";
@@ -2834,7 +2834,7 @@ export async function runLLMStream(params: {
         citationsOpenSeen = false;
     };
 
-    const selectedModel = resolveModel(model, DEFAULT_MAIN_MODEL);
+    const selectedModel = resolveModel(model, defaultMainModel());
 
     await streamChatWithTools({
         model: selectedModel,
