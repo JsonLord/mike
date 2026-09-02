@@ -1,6 +1,4 @@
 // @ts-nocheck
-// @ts-nocheck
-// @ts-nocheck
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -129,7 +127,7 @@ app.get("/api-docs", (_req, res) => {
     title: "Mike API Documentation",
     version: "1.0.0",
     endpoints: [
-      { path: "/health", method: "GET", purpose: "Health check" },
+      { path: "/health", method: "GET", purpose: "Health check endpoint returning { ok: true }" },
       { path: "/chat", method: "GET/POST/PATCH/DELETE", purpose: "Manage chats and run inference" },
       { path: "/projects", method: "GET/POST/PATCH/DELETE", purpose: "Manage projects" },
       { path: "/projects/:projectId/chat", method: "GET/POST", purpose: "Project-specific chat" },
@@ -145,134 +143,6 @@ app.get("/api-docs", (_req, res) => {
       { path: "/users", method: "GET/PATCH", purpose: "Alias for /user" },
       { path: "/download", method: "GET", purpose: "Download documents" },
       { path: "/api-docs", method: "GET", purpose: "API Documentation" },
-    ],
-  });
-});
-
-app.get("/api-docs", (_req, res) => {
-  res.json({
-    title: "Mike API Documentation",
-    version: "1.0.0",
-    endpoints: [
-      { path: "/health", method: "GET", purpose: "Health check" },
-      { path: "/chat", method: "GET/POST/PATCH/DELETE", purpose: "Manage chats and run inference" },
-      { path: "/projects", method: "GET/POST/PATCH/DELETE", purpose: "Manage projects" },
-      { path: "/projects/:projectId/chat", method: "GET/POST", purpose: "Project-specific chat" },
-      { path: "/projects/:projectId/documents", method: "POST", purpose: "Upload document to project" },
-      { path: "/single-documents", method: "GET/POST/PATCH/DELETE", purpose: "Manage documents" },
-      { path: "/single-documents/:documentId/versions", method: "GET/POST", purpose: "Manage document versions" },
-      { path: "/tabular-review", method: "GET/POST/PATCH/DELETE", purpose: "Manage tabular reviews" },
-      { path: "/tabular-review/:reviewId/generate", method: "POST", purpose: "Run tabular generation" },
-      { path: "/tabular-review/:reviewId/chat", method: "POST", purpose: "Chat about tabular review" },
-      { path: "/workflows", method: "GET/POST/PATCH/DELETE", purpose: "Manage workflows" },
-      { path: "/user", method: "GET/PATCH", purpose: "Manage user profile" },
-      { path: "/user/api-keys", method: "GET/PUT", purpose: "Manage API keys" },
-      { path: "/users", method: "GET/PATCH", purpose: "Alias for /user" },
-      { path: "/download", method: "GET", purpose: "Download documents" },
-      { path: "/api-docs", method: "GET", purpose: "API Documentation" },
-    ],
-  });
-});
-
-app.get("/api-docs", (_req, res) => {
-  res.json({
-    title: "Mike API Documentation",
-    version: "1.0.0",
-    endpoints: [
-      { path: "/health", method: "GET", purpose: "Health check" },
-      { path: "/chat", method: "GET/POST/PATCH/DELETE", purpose: "Manage chats and run inference" },
-      { path: "/projects", method: "GET/POST/PATCH/DELETE", purpose: "Manage projects" },
-      { path: "/projects/:projectId/chat", method: "GET/POST", purpose: "Project-specific chat" },
-      { path: "/projects/:projectId/documents", method: "POST", purpose: "Upload document to project" },
-      { path: "/single-documents", method: "GET/POST/PATCH/DELETE", purpose: "Manage documents" },
-      { path: "/single-documents/:documentId/versions", method: "GET/POST", purpose: "Manage document versions" },
-      { path: "/tabular-review", method: "GET/POST/PATCH/DELETE", purpose: "Manage tabular reviews" },
-      { path: "/tabular-review/:reviewId/generate", method: "POST", purpose: "Run tabular generation" },
-      { path: "/tabular-review/:reviewId/chat", method: "POST", purpose: "Chat about tabular review" },
-      { path: "/workflows", method: "GET/POST/PATCH/DELETE", purpose: "Manage workflows" },
-      { path: "/user", method: "GET/PATCH", purpose: "Manage user profile" },
-      { path: "/user/api-keys", method: "GET/PUT", purpose: "Manage API keys" },
-      { path: "/users", method: "GET/PATCH", purpose: "Alias for /user" },
-      { path: "/download", method: "GET", purpose: "Download documents" },
-      { path: "/api-docs", method: "GET", purpose: "API Documentation" },
-    ],
-  });
-});
-
-app.get("/api-docs", (_req, res) => {
-  res.json({
-    title: "Mike API Documentation",
-    version: "1.0.0",
-    endpoints: [
-      { path: "/health", method: "GET", purpose: "Health check" },
-      { path: "/chat", method: "GET/POST/PATCH/DELETE", purpose: "Manage chats and run inference" },
-      { path: "/projects", method: "GET/POST/PATCH/DELETE", purpose: "Manage projects" },
-      { path: "/projects/:projectId/chat", method: "GET/POST", purpose: "Project-specific chat" },
-      { path: "/projects/:projectId/documents", method: "POST", purpose: "Upload document to project" },
-      { path: "/single-documents", method: "GET/POST/PATCH/DELETE", purpose: "Manage documents" },
-      { path: "/single-documents/:documentId/versions", method: "GET/POST", purpose: "Manage document versions" },
-      { path: "/tabular-review", method: "GET/POST/PATCH/DELETE", purpose: "Manage tabular reviews" },
-      { path: "/tabular-review/:reviewId/generate", method: "POST", purpose: "Run tabular generation" },
-      { path: "/tabular-review/:reviewId/chat", method: "POST", purpose: "Chat about tabular review" },
-      { path: "/workflows", method: "GET/POST/PATCH/DELETE", purpose: "Manage workflows" },
-      { path: "/user", method: "GET/PATCH", purpose: "Manage user profile" },
-      { path: "/user/api-keys", method: "GET/PUT", purpose: "Manage API keys" },
-      { path: "/users", method: "GET/PATCH", purpose: "Alias for /user" },
-      { path: "/download", method: "GET", purpose: "Download documents" },
-      { path: "/api-docs", method: "GET", purpose: "API Documentation" },
-    ],
-  });
-});
-
-app.get("/api-docs", (_req, res) => {
-  res.json({
-    title: "Mike API Documentation",
-    version: "1.0.0",
-    endpoints: [
-      { path: "/health", method: "GET", purpose: "Health check" },
-      { path: "/chat", method: "GET/POST/PATCH/DELETE", purpose: "Manage chats and run inference" },
-      { path: "/projects", method: "GET/POST/PATCH/DELETE", purpose: "Manage projects" },
-      { path: "/projects/:projectId/chat", method: "GET/POST", purpose: "Project-specific chat" },
-      { path: "/single-documents", method: "GET/POST/PATCH/DELETE", purpose: "Manage documents" },
-      { path: "/tabular-review", method: "GET/POST/PATCH/DELETE", purpose: "Manage tabular reviews" },
-      { path: "/workflows", method: "GET/POST/PATCH/DELETE", purpose: "Manage workflows" },
-      { path: "/user", method: "GET/PATCH", purpose: "Manage user profile and settings" },
-      { path: "/download", method: "GET", purpose: "Download documents" },
-      { path: "/api-docs", method: "GET", purpose: "API Documentation" },
-    ],
-  });
-});
-
-app.get("/api-docs", (_req, res) => {
-  res.json({
-    title: "Mike API Documentation",
-    version: "1.0.0",
-    endpoints: [
-      {
-        path: "/health",
-        method: "GET",
-        purpose: "Health check",
-      },
-      {
-        path: "/chat",
-        method: "POST",
-        purpose: "Run chat inference",
-      },
-      {
-        path: "/projects",
-        method: "GET/POST",
-        purpose: "Manage projects",
-      },
-      {
-        path: "/single-documents",
-        method: "POST",
-        purpose: "Upload documents",
-      },
-      {
-        path: "/api-docs",
-        method: "GET",
-        purpose: "API Documentation",
-      },
     ],
   });
 });

@@ -4,17 +4,6 @@ sdk: docker
 app_port: 7860
 ---
 
----
-title: Mike
-sdk: docker
-app_port: 7860
----
+# Mike - Document & Review Analysis Assistant
 
----
-title: Mike
-sdk: docker
-app_port: 7860
----
-
-
-
+Mike is a full-stack legal and document analysis application featuring an Express TypeScript backend and Next.js frontend.
