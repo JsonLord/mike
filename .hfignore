@@ -1,9 +1,11 @@
 .git
-node_modules
-.next
-dist
-backend/node_modules
-frontend/node_modules
-backend/dist
+.git/**
+**/node_modules/**
+node_modules/**
+**/.next/**
+.next/**
+**/dist/**
+dist/**
 .env
+.env.*
 *.log
