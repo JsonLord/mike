@@ -1,7 +1,4 @@
 // @ts-nocheck
-// @ts-nocheck
-// @ts-nocheck
-// @ts-nocheck
 import type {
     LlmMessage,
     NormalizedToolCall,
@@ -34,9 +31,9 @@ function getEndpoint(): string {
 
 function getModel(override?: string): string {
     return (
+        override?.trim() ||
         process.env.OPENAI_COMPATIBLE_MODEL?.trim() ||
         process.env.OPENAI_MODEL?.trim() ||
-        override?.trim() ||
         "gpt-4o"
     );
 }
