@@ -1,6 +1,6 @@
 # Deployment Manager Instructions & Best Practices - Hugging Face Space
 
-This document serves as the guide for deployment managers and automated agents deploying and maintaining the **mike** project on Hugging Face Spaces.
+This document serves as the guide for deployment managers and automated agents deploying and maintaining the application on Hugging Face Spaces.
 
 ---
 
@@ -8,20 +8,20 @@ This document serves as the guide for deployment managers and automated agents d
 
 ### Target Space
 - **Profile:** `Leon4gr45`
-- **Space:** `mike`
-- **Full Identifier:** `Leon4gr45/mike`
+- **Space:** `scriber`
+- **Full Identifier:** `Leon4gr45/scriber`
 - **Frontend Port:** `7860` (mandatory for Hugging Face Spaces)
 
 ### Deployment Method
 - **Docker SDK:** The project utilizes a custom multi-stage Dockerfile containing Next.js frontend (port 3000), Express backend (port 3001), and Nginx reverse proxy serving on port 7860.
 
 ### HF Token Security
-- The Hugging Face API Token must always be read from the environment (e.g., `$HF_TOKEN`).
+- The Hugging Face API Token must always be read from the environment or provided via variables (`$HF_TOKEN`).
 - **Never hardcode token credentials in repository source files.**
 
 ### Required Files
 - `Dockerfile` (Configured to expose port 7860 via Nginx)
-- `README.md` (Contains Hugging Face YAML metadata header with title, docker sdk, app_port)
+- `README.md` (Contains Hugging Face YAML metadata header with title: scriber, sdk: docker, app_port: 7860)
 - `.hfignore` (Excludes `.git`, `node_modules`, build artifacts, and log files)
 - `Agent.md` (This documentation file)
 
@@ -34,12 +34,12 @@ This document serves as the guide for deployment managers and automated agents d
 - **`/health`**
   - **Method:** GET
   - **Purpose:** Health check returning HTTP 200 `{ "ok": true }`.
-  - **URL:** `https://leon4gr45-mike.hf.space/health`
+  - **URL:** `https://leon4gr45-scriber.hf.space/health`
 
 - **`/api-docs`**
   - **Method:** GET
   - **Purpose:** Exposes structured JSON documentation of all active endpoints.
-  - **URL:** `https://leon4gr45-mike.hf.space/api-docs`
+  - **URL:** `https://leon4gr45-scriber.hf.space/api-docs`
 
 ### Functional Endpoints
 
@@ -139,7 +139,7 @@ Before uploading code to the Hugging Face Space, verify remote repo contents to 
 python3 -c "
 from huggingface_hub import HfApi
 api = HfApi(token='<HF_TOKEN>')
-print(api.list_repo_files(repo_id='Leon4gr45/mike', repo_type='space'))
+print(api.list_repo_files(repo_id='Leon4gr45/scriber', repo_type='space'))
 "
 ```
 
@@ -147,22 +147,22 @@ print(api.list_repo_files(repo_id='Leon4gr45/mike', repo_type='space'))
 To deploy to Hugging Face Space:
 
 ```bash
-hf upload Leon4gr45/mike . --repo-type=space --token $HF_TOKEN
+huggingface-cli upload Leon4gr45/scriber . --repo-type=space --token $HF_TOKEN
 ```
 
 ### Log Monitoring Loop
 1. Stream build logs:
 ```bash
-curl -N -H "Authorization: Bearer $HF_TOKEN" "https://huggingface.co/api/spaces/Leon4gr45/mike/logs/build"
+curl -N -H "Authorization: Bearer $HF_TOKEN" "https://huggingface.co/api/spaces/Leon4gr45/scriber/logs/build"
 ```
 2. Once build succeeds, stream runtime logs:
 ```bash
-curl -N -H "Authorization: Bearer $HF_TOKEN" "https://huggingface.co/api/spaces/Leon4gr45/mike/logs/run"
+curl -N -H "Authorization: Bearer $HF_TOKEN" "https://huggingface.co/api/spaces/Leon4gr45/scriber/logs/run"
 ```
 3. Wait up to 300 seconds for state transition to **RUNNING**.
 4. Verify HTTP 200 response from health & api-docs endpoints:
 ```bash
-curl -f https://leon4gr45-mike.hf.space/health
-curl -f https://leon4gr45-mike.hf.space/api-docs
+curl -f https://leon4gr45-scriber.hf.space/health
+curl -f https://leon4gr45-scriber.hf.space/api-docs
 ```
 5. If any failure occurs, inspect logs, apply codebase fixes, and re-run deployment.

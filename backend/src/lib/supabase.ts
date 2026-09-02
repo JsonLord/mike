@@ -38,6 +38,34 @@ class QueryBuilder {
     return this;
   }
 
+  or(filterStr: string) {
+    if (!filterStr) return this;
+    // Simple parser for PostgREST-style or strings like "user_id.eq.123,project_id.in.(p1,p2)"
+    const conditions = filterStr.split(/,(?=[a-zA-Z0-9_]+\.)/);
+    const checkFns: Array<(item: any) => boolean> = [];
+
+    for (const cond of conditions) {
+      const matchEq = cond.match(/^([a-zA-Z0-9_]+)\.eq\.(.+)$/);
+      if (matchEq) {
+        const [, col, val] = matchEq;
+        checkFns.push((item) => item && String(item[col]) === val);
+        continue;
+      }
+      const matchIn = cond.match(/^([a-zA-Z0-9_]+)\.in\.\((.+)\)$/);
+      if (matchIn) {
+        const [, col, rawVals] = matchIn;
+        const vals = new Set(rawVals.split(",").map((v) => v.trim()));
+        checkFns.push((item) => item && vals.has(String(item[col])));
+        continue;
+      }
+    }
+
+    if (checkFns.length > 0) {
+      this.filters.push((item) => checkFns.some((fn) => fn(item)));
+    }
+    return this;
+  }
+
   filter(col: string, _op: string, val: any) {
     let checkVal = val;
     if (typeof val === "string") {
