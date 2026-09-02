@@ -43,9 +43,8 @@ export function useFetchSingleDoc(
                 const token = session?.access_token;
                 if (cancelled) return;
 
-                const apiBase =
-                    process.env.NEXT_PUBLIC_API_BASE_URL ??
-                    "http://localhost:3001";
+                const apiBase = typeof window === "undefined" ? "http://127.0.0.1:3001" : "/api";
+                    "";
                 const qs = versionId
                     ? `?version_id=${encodeURIComponent(versionId)}`
                     : "";

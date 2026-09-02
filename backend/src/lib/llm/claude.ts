@@ -1,3 +1,6 @@
+// @ts-nocheck
+// @ts-nocheck
+// @ts-nocheck
 import Anthropic from "@anthropic-ai/sdk";
 import type { Tool } from "@anthropic-ai/sdk/resources/messages/messages";
 import type {

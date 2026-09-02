@@ -1,0 +1,11 @@
+.git
+.git/**
+**/node_modules/**
+node_modules/**
+**/.next/**
+.next/**
+**/dist/**
+dist/**
+.env
+.env.*
+*.log

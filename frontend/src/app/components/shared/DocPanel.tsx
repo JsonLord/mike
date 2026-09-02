@@ -359,9 +359,8 @@ function EditResolveButtons({
                     data: { session },
                 } = await supabase.auth.getSession();
                 const token = session?.access_token;
-                const apiBase =
-                    process.env.NEXT_PUBLIC_API_BASE_URL ??
-                    "http://localhost:3001";
+                const apiBase = typeof window === "undefined" ? "http://127.0.0.1:3001" : "/api";
+                    "";
                 const resp = await fetch(
                     `${apiBase}/single-documents/${edit.document_id}/edits/${edit.edit_id}/${verb}`,
                     {
@@ -461,8 +460,7 @@ function DownloadButton({
                 data: { session },
             } = await supabase.auth.getSession();
             const token = session?.access_token;
-            const apiBase =
-                process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
+            const apiBase = typeof window === "undefined" ? "http://127.0.0.1:3001" : "/api";
             const qs = versionId
                 ? `?version_id=${encodeURIComponent(versionId)}`
                 : "";

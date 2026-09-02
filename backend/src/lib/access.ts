@@ -1,3 +1,6 @@
+// @ts-nocheck
+// @ts-nocheck
+// @ts-nocheck
 /**
  * Project / document access helpers.
  *

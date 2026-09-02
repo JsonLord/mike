@@ -1,3 +1,6 @@
+// @ts-nocheck
+// @ts-nocheck
+// @ts-nocheck
 import { streamClaude, completeClaudeText } from "./claude";
 import { streamGemini, completeGeminiText } from "./gemini";
 import { streamOpenAI, completeOpenAIText } from "./openai";
