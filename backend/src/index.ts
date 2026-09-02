@@ -149,6 +149,17 @@ app.get("/api-docs", (_req, res) => {
   });
 });
 
+// A rejected promise escaping a route handler would otherwise terminate the
+// process, and nothing restarts it inside the container — one failed request
+// would take the whole deployment down with 502s. Log and stay up instead.
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err);
+});
+
 app.listen(PORT, () => {
   console.log(`Mike backend running on port ${PORT}`);
 });
