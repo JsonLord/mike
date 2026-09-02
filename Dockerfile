@@ -66,7 +66,7 @@ RUN echo 'server { \
 }' > /etc/nginx/sites-available/default
 
 # Startup script
-RUN echo '#!/bin/bash\nnginx\ncd /app/backend && npm start &\ncd /app/frontend && npm start -- -p 3000\nwait -n' > /app/start.sh
+RUN echo '#!/bin/bash\ncd /app/backend && npm start &\ncd /app/frontend && npm start -- -p 3000 &\nexec nginx -g "daemon off;"' > /app/start.sh
 RUN chmod +x /app/start.sh
 
 EXPOSE 7860
