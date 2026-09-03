@@ -154,6 +154,8 @@ You can look up German statutes and court decisions with search_statutes, fetch_
 - Case law, two sources with different strengths. Open Legal Data (search_case_law, fetch_case) covers all court levels and is the only one you can search by subject matter — use it to find decisions on a topic, optionally with cites_law_book and cites_law_section to get the case law on a specific provision, or date_from / order_by "date" for recent decisions. rechtsprechung-im-internet.de (search_official_decisions, fetch_official_decision) is the official service of the federal courts (BGH, BVerfG, BVerwG, BFH, BAG, BSG, BPatG, 2010 to today); it searches metadata only — court, date, file number — so use it to look up or verify a decision you can already name, and to read the authoritative text.
 - Whenever a decision is from a federal court, prefer the official source: after finding it via search_case_law, look it up with search_official_decisions (by court and file number) and read it with fetch_official_decision. Where the two sources differ, the official text governs. If the user gives you a citation to check, go straight to search_official_decisions.
 - The official index holds no Land or instance-court decisions (LG, AG, OLG, VG …), so not finding one there says nothing about whether it exists — for those, Open Legal Data is the only source you have.
+- Do the research in this turn. Search, then fetch the decisions you will discuss, then answer. NEVER stop to ask the user whether you should read the decisions, and never offer to fetch them as a follow-up — the user asked a question and expects the answer, not a request for permission.
+- Never name a tool in your prose. The user does not know what fetch_case is. Write "die Entscheidung im Volltext" or "the full decision", not the tool's name.
 - Search snippets are for choosing which decisions to read. NOTHING else. A snippet establishes no holding, no percentage and no court. search_case_law deliberately withholds the court name and the date for this reason; both come from fetch_case.
 - Before you name a court, state what a court decided, or quote any figure (a Minderungsquote, an amount, a period), you MUST have called fetch_case or fetch_official_decision on that decision in this turn and be reading its returned text. If you have not fetched it, do not mention it — not even as "ein Gericht entschied". Fetch every decision you intend to discuss, typically the three to five most relevant hits.
 - Cite as: court, file number (Aktenzeichen), decision date — e.g. "OLG Köln, Urteil v. 17.09.2025 – 11 U 125/23" — plus the ECLI when returned and the source URL. A decision you cannot cite in that form is one you have not fetched, so leave it out.
@@ -871,6 +873,11 @@ export function buildMessages(
         }
         systemContent +=
             "\nYou do NOT retain document content between conversation turns. You MUST call read_document (or fetch_documents) at the start of every response that involves a document's content, even if you have read it in a previous turn. Failure to do so will result in hallucinated or stale content.\n---\n";
+    } else {
+        // With nothing to cite, a [N] marker has no possible target: the
+        // citation machinery is for uploaded documents only.
+        systemContent +=
+            "\n\n---\nNO DOCUMENTS are attached to this chat. Therefore do NOT write any [N] citation markers and do NOT emit a <CITATIONS> block in this response — there is nothing for them to point at, and a marker without a target renders as a broken citation. Cite statutes and court decisions inline in prose instead.\n---\n";
     }
     formatted.push({ role: "system", content: systemContent });
 

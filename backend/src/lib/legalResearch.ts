@@ -176,7 +176,7 @@ export async function searchCaseLaw(params: CaseSearchParams) {
     return {
         source: "Open Legal Data (de.openlegaldata.io)",
         coverage_note:
-            "Free, partial corpus of German decisions. Absence of a hit is NOT evidence that no such case law exists — say so rather than concluding none exists.",
+            "Open Legal Data covers courts at ALL levels — Amtsgericht, Landgericht, Oberlandesgericht and the federal courts — but its coverage of each is incomplete. Do not describe it as excluding any court level; describe it as a free database whose coverage is partial. Absence of a hit is NOT evidence that no such case law exists — say so rather than concluding none exists.",
         total_matches: data.count ?? 0,
         returned: (data.results ?? []).length,
         how_to_use:
