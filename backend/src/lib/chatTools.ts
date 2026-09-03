@@ -22,6 +22,12 @@ import {
     loadActiveVersion,
 } from "./documentVersions";
 import {
+    fetchCase,
+    fetchStatute,
+    searchCaseLaw,
+    searchStatutes,
+} from "./legalResearch";
+import {
     streamChatWithTools,
     resolveModel,
     defaultMainModel,
@@ -136,6 +142,14 @@ When a user message begins with a [Workflow: <title> (id: <id>)] marker, the use
 
 DOCUMENT NAMING IN PROSE:
 The chat-local labels ("doc-0", "doc-1", "doc-N", …) are internal handles for tool calls and citation JSON ONLY. NEVER write them in your prose response or in any text the user reads — not in body text, not in headings, not in lists, not in tool-activity descriptions. The user does not know what "doc-0" means and seeing it is jarring. When referring to a document in prose, always use its filename (e.g. "the NDA draft" or "nda_v1.docx"). This rule applies to every word streamed back to the user; the only places "doc-N" identifiers are allowed are inside tool-call arguments and inside the <CITATIONS> JSON block's "doc_id" field.
+
+LEGAL RESEARCH (German law):
+You can look up German statutes and court decisions with search_statutes, fetch_statute, search_case_law and fetch_case. Use them — do not answer from memory when the answer turns on the current wording of a provision or on how courts have decided a question. Your training data has a cutoff; these tools do not.
+- Statutes: gesetze-im-internet.de, the official consolidated federal text, i.e. the version in force today. Call fetch_statute before quoting or relying on a provision. If you are unsure which provision applies, call search_statutes first, then confirm the wording with fetch_statute. Never quote a provision from a search snippet or from memory. This source has no historic versions: if the user needs the text in force at an earlier date, say so plainly.
+- Case law: the free Open Legal Data corpus. To find the case law on a specific provision, use search_case_law with cites_law_book and cites_law_section. For recent decisions, set date_from or order_by "date".
+- NEVER cite a decision from search snippets alone. Call fetch_case first and cite it as: court, file number (Aktenzeichen), and decision date — e.g. "OLG Köln, Urteil v. 17.09.2025 – 11 U 125/23". Add the ECLI when one is returned, and give the source URL.
+- State which source you searched. Open Legal Data is free and its coverage is INCOMPLETE — it is not Beck-Online or juris. If a search returns nothing, say that nothing was found in the searched free database, never that no such case law exists. Where a matter is important, tell the user that a Beck-Online or juris search is still needed for a complete picture.
+- If a lookup fails or a source is unreachable, say what you could not verify. Never invent a decision, a file number, an ECLI, or statutory wording, and never present remembered law as a tool result.
 
 GENERAL GUIDANCE:
 - Be precise and professional
@@ -449,6 +463,133 @@ export const TOOLS = [
                     },
                 },
                 required: ["doc_id", "edits"],
+            },
+        },
+    },
+];
+
+// ---------------------------------------------------------------------------
+// Legal research tools
+// ---------------------------------------------------------------------------
+// Free public sources only — the official statute service and an open case-law
+// corpus. Appended to TOOLS so every chat surface gets them.
+
+export const LEGAL_RESEARCH_TOOLS = [
+    {
+        type: "function",
+        function: {
+            name: "search_case_law",
+            description:
+                "Full-text search of German court decisions in the free Open Legal Data corpus (de.openlegaldata.io). Use this whenever the answer depends on how courts have actually decided a question, or when the user asks for current case law. Returns matching decisions with highlighted snippets. IMPORTANT: this corpus is free and INCOMPLETE — it is not Beck-Online or juris. Never present an empty or thin result as proof that no case law exists.",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: {
+                        type: "string",
+                        description:
+                            "Search terms in German, e.g. 'Mietminderung Schimmel' or 'Verkehrssicherungspflicht Winterdienst'. Lucene syntax is supported.",
+                    },
+                    date_from: {
+                        type: "string",
+                        description:
+                            "Only decisions on or after this date (YYYY-MM-DD). Use this when the user asks for recent case law.",
+                    },
+                    date_to: {
+                        type: "string",
+                        description: "Only decisions on or before this date (YYYY-MM-DD).",
+                    },
+                    order_by: {
+                        type: "string",
+                        enum: ["relevance", "date", "most_cited"],
+                        description:
+                            "'relevance' (default), 'date' for the newest first, or 'most_cited' for the leading decisions.",
+                    },
+                    cites_law_book: {
+                        type: "string",
+                        description:
+                            "Restrict to decisions citing this statute book, lowercase slug, e.g. 'bgb'. Combine with cites_law_section to find the case law on a specific provision.",
+                    },
+                    cites_law_section: {
+                        type: "string",
+                        description:
+                            "Restrict to decisions citing this section of cites_law_book, e.g. '536'. Requires cites_law_book.",
+                    },
+                    limit: {
+                        type: "integer",
+                        description: "How many decisions to return (1-10, default 5).",
+                    },
+                },
+                required: ["query"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "fetch_case",
+            description:
+                "Read one court decision in full, by the case_id returned from search_case_law. Returns the court, the file number (Aktenzeichen), the ECLI, the decision date, a source URL and the decision text. You MUST call this before citing a decision — the file number needed for a proper citation is not in the search results.",
+            parameters: {
+                type: "object",
+                properties: {
+                    case_id: {
+                        type: "string",
+                        description: "Numeric case_id from a search_case_law result.",
+                    },
+                },
+                required: ["case_id"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "search_statutes",
+            description:
+                "Find which German statutory provision governs a question, when you do not already know the section number. Searches an index of statute text and returns candidate provisions with their book code and section. Follow up with fetch_statute for the official wording — never quote a provision from these snippets alone.",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: {
+                        type: "string",
+                        description:
+                            "What the provision should cover, in German, e.g. 'Kündigungsfrist Mietverhältnis'.",
+                    },
+                    book_code: {
+                        type: "string",
+                        description:
+                            "Restrict to one statute book, e.g. 'BGB', 'StGB', 'HGB'.",
+                    },
+                    limit: {
+                        type: "integer",
+                        description: "How many provisions to return (1-10, default 5).",
+                    },
+                },
+                required: ["query"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "fetch_statute",
+            description:
+                "Read the official current wording of a German federal statutory provision from gesetze-im-internet.de (Bundesministerium der Justiz). This is the consolidated text in force today, so it reflects the latest amendments. Always call this before quoting or relying on a provision instead of reciting it from memory. Historic versions in force at an earlier date are NOT available.",
+            parameters: {
+                type: "object",
+                properties: {
+                    book: {
+                        type: "string",
+                        description:
+                            "The law's abbreviation as used by gesetze-im-internet.de, lowercase, e.g. 'bgb', 'stgb', 'hgb', 'gg', 'arbzg'.",
+                    },
+                    section: {
+                        type: "string",
+                        description:
+                            "The section or article number, e.g. '242', '536', '312a', or '1' for Art. 1 GG.",
+                    },
+                },
+                required: ["book", "section"],
             },
         },
     },
@@ -1878,7 +2019,58 @@ export async function runToolCalls(
             /* ignore */
         }
 
-        if (tc.function.name === "read_document") {
+        if (
+            tc.function.name === "search_case_law" ||
+            tc.function.name === "fetch_case" ||
+            tc.function.name === "search_statutes" ||
+            tc.function.name === "fetch_statute"
+        ) {
+            // Research sources are third-party and can be slow or down; a
+            // failure is reported back to the model as a result, never thrown,
+            // so the turn continues and the model can say what it could not
+            // verify.
+            let result: unknown;
+            try {
+                if (tc.function.name === "search_case_law") {
+                    result = await searchCaseLaw({
+                        query: String(args.query ?? ""),
+                        date_from: args.date_from as string | undefined,
+                        date_to: args.date_to as string | undefined,
+                        order_by: args.order_by as
+                            | "relevance"
+                            | "date"
+                            | "most_cited"
+                            | undefined,
+                        cites_law_book: args.cites_law_book as string | undefined,
+                        cites_law_section: args.cites_law_section as string | undefined,
+                        limit: Number(args.limit) || undefined,
+                    });
+                } else if (tc.function.name === "fetch_case") {
+                    result = await fetchCase(String(args.case_id ?? ""));
+                } else if (tc.function.name === "search_statutes") {
+                    result = await searchStatutes({
+                        query: String(args.query ?? ""),
+                        book_code: args.book_code as string | undefined,
+                        limit: Number(args.limit) || undefined,
+                    });
+                } else {
+                    result = await fetchStatute({
+                        book: String(args.book ?? ""),
+                        section: String(args.section ?? ""),
+                    });
+                }
+            } catch (err) {
+                console.error(`[${tc.function.name}]`, err);
+                result = {
+                    error: `Legal research lookup failed: ${err instanceof Error ? err.message : String(err)}`,
+                };
+            }
+            toolResults.push({
+                role: "tool",
+                tool_call_id: tc.id,
+                content: JSON.stringify(result),
+            });
+        } else if (tc.function.name === "read_document") {
             const rawDocId = args.doc_id as string;
             const docId =
                 resolveDocLabel(rawDocId, docStore, docIndex) ?? rawDocId;
@@ -2750,8 +2942,8 @@ export async function runLLMStream(params: {
         projectId,
     } = params;
     const activeTools = extraTools?.length
-        ? [...TOOLS, ...WORKFLOW_TOOLS, ...extraTools]
-        : [...TOOLS, ...WORKFLOW_TOOLS];
+        ? [...TOOLS, ...LEGAL_RESEARCH_TOOLS, ...WORKFLOW_TOOLS, ...extraTools]
+        : [...TOOLS, ...LEGAL_RESEARCH_TOOLS, ...WORKFLOW_TOOLS];
 
     // Extract system prompt; pass remaining turns to the adapter as
     // plain user/assistant messages.
