@@ -35,6 +35,14 @@ const FETCH_TIMEOUT_MS = 25000;
 /** Full decision texts run long; cap what we hand the model. */
 const MAX_CASE_CHARS = 20000;
 
+/**
+ * Where the official statute service is blocked at network level, every lookup
+ * would otherwise pay a ~10s TCP connect timeout before falling back. Remember
+ * the failure and go straight to the mirror for a while.
+ */
+const OFFICIAL_UNREACHABLE_MS = 10 * 60 * 1000;
+let officialUnreachableUntil = 0;
+
 export type LegalError = { error: string };
 
 function isError<T>(v: T | LegalError): v is LegalError {
@@ -339,14 +347,19 @@ export async function fetchStatute(params: { book: string; section: string }) {
     }
 
     const attempted: string[] = [];
-    let officialUnreachable = false;
-    for (const url of statuteUrls(book, section)) {
+    let officialUnreachable = Date.now() < officialUnreachableUntil;
+    for (const url of officialUnreachable ? [] : statuteUrls(book, section)) {
         attempted.push(url);
         const got = await httpGet(url, FETCH_TIMEOUT_MS);
         if (!got.ok) {
             // Network-level failure: this deployment cannot reach the official
-            // service at all, so stop trying URL forms and use the mirror.
+            // service at all, so stop trying URL forms and use the mirror —
+            // and skip the official service entirely for the next few minutes.
             officialUnreachable = true;
+            officialUnreachableUntil = Date.now() + OFFICIAL_UNREACHABLE_MS;
+            console.warn(
+                `[legal] gesetze-im-internet.de unreachable (${got.error}); using the mirror for the next ${OFFICIAL_UNREACHABLE_MS / 60000} minutes`,
+            );
             break;
         }
         if (got.res.status === 404) continue;
@@ -360,6 +373,7 @@ export async function fetchStatute(params: { book: string; section: string }) {
         if (!parsed) {
             return { error: `Could not parse the statute page at ${url}.` };
         }
+        officialUnreachableUntil = 0;
         return {
             source: "gesetze-im-internet.de (Bundesministerium der Justiz)",
             law: parsed.law,

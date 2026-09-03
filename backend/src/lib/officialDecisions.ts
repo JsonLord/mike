@@ -158,7 +158,14 @@ async function buildIndex(): Promise<IndexCache | null> {
         console.log(`[rii] index built: ${entries.length} decisions`);
         return cache;
     } catch (err) {
-        console.error("[rii] index build failed", err);
+        const cause = (err as { cause?: { code?: string } })?.cause?.code;
+        const reason =
+            err instanceof Error && err.name === "AbortError"
+                ? "timed out"
+                : cause || (err instanceof Error ? err.message : String(err));
+        // One line, not a stack: an unreachable source is an expected
+        // condition on deployments whose egress blocks it.
+        console.error(`[rii] index build failed: ${reason} (${TOC_URL})`);
         return null;
     } finally {
         clearTimeout(timer);

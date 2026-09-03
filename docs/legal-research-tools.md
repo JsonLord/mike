@@ -75,7 +75,11 @@ works. Consequences:
   text, resolved through a per-book section index (`book__latest=true`, paged
   and cached in memory). The payload then carries `authoritative: false`, the
   `official_url`, and `mirror_last_updated`; the prompt requires the assistant
-  to say the wording came from a mirror and to give the official URL.
+  to say the wording came from a mirror and to give the official URL. A
+  network-level failure also opens a ten-minute circuit breaker, so subsequent
+  lookups go straight to the mirror instead of each paying the ~10s TCP connect
+  timeout first (measured on the Space: 10.4s for the first statute read, ~0.3s
+  after). A successful official read closes the breaker again.
 - **The official decision index does not.** `search_official_decisions` returns
   a clear unavailability message and the prompt tells the assistant to fall back
   to `search_case_law` and never to read it as an absence of decisions. After a
