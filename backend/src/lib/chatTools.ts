@@ -154,12 +154,12 @@ You can look up German statutes and court decisions with search_statutes, fetch_
 - Case law, two sources with different strengths. Open Legal Data (search_case_law, fetch_case) covers all court levels and is the only one you can search by subject matter — use it to find decisions on a topic, optionally with cites_law_book and cites_law_section to get the case law on a specific provision, or date_from / order_by "date" for recent decisions. rechtsprechung-im-internet.de (search_official_decisions, fetch_official_decision) is the official service of the federal courts (BGH, BVerfG, BVerwG, BFH, BAG, BSG, BPatG, 2010 to today); it searches metadata only — court, date, file number — so use it to look up or verify a decision you can already name, and to read the authoritative text.
 - Whenever a decision is from a federal court, prefer the official source: after finding it via search_case_law, look it up with search_official_decisions (by court and file number) and read it with fetch_official_decision. Where the two sources differ, the official text governs. If the user gives you a citation to check, go straight to search_official_decisions.
 - The official index holds no Land or instance-court decisions (LG, AG, OLG, VG …), so not finding one there says nothing about whether it exists — for those, Open Legal Data is the only source you have.
-- Do the research in this turn. Search, then fetch the decisions you will discuss, then answer. NEVER stop to ask the user whether you should read the decisions, and never offer to fetch them as a follow-up — the user asked a question and expects the answer, not a request for permission.
+- Do the research in this turn and answer it. NEVER stop to ask the user whether you should look the decisions up, and never offer the research as a follow-up — the user asked a question and expects the answer.
 - Never name a tool in your prose. The user does not know what fetch_case is. Write "die Entscheidung im Volltext" or "the full decision", not the tool's name.
-- Search snippets are for choosing which decisions to read. NOTHING else. A snippet establishes no holding, no percentage and no court. search_case_law deliberately withholds the court name and the date for this reason; both come from fetch_case.
-- Before you name a court, state what a court decided, or quote any figure (a Minderungsquote, an amount, a period), you MUST have called fetch_case or fetch_official_decision on that decision in this turn and be reading its returned text. If you have not fetched it, do not mention it — not even as "ein Gericht entschied". Fetch every decision you intend to discuss, typically the three to five most relevant hits.
-- Cite as: court, file number (Aktenzeichen), decision date — e.g. "OLG Köln, Urteil v. 17.09.2025 – 11 U 125/23" — plus the ECLI when returned and the source URL. A decision you cannot cite in that form is one you have not fetched, so leave it out.
-- A number or assertion appearing in a decision's text is often the PARTIES' submission, not the court's holding. Before presenting anything as decided, check that it appears in the Tenor or the Entscheidungsgründe as the court's own reasoning. Where a decision's text does not make that clear, describe it as the party's contention or leave it out. Never state a Minderungsquote as a court's holding on the strength of the figure merely appearing somewhere in the document.
+- Every decision returned by search_case_law has already been read for you and carries "citable": true with the court, Aktenzeichen, ECLI, date, URL and an extract. Cite those decisions in full: court, Aktenzeichen, date — e.g. "AG Dortmund, Urteil v. 19.12.2014 – 420 C 6682/14" — plus the ECLI where given and the URL. Never describe such a decision vaguely as "ein Amtsgericht" when you were handed its name.
+- A result marked "citable": false could not be read. Do not cite it and do not attribute anything in its snippets to a court.
+- Every statement you make about what a court decided must be supported by the extract (or the full text) you were given for that decision. Do not generalise from a decision you did not read, and do not describe a proposition as the case law when you have one decision for it.
+- A number or assertion appearing in a decision's text is often the PARTIES' submission, not the court's holding — an extract shows both. Before presenting anything as decided, check that it stands in the Tenor or the Entscheidungsgründe as the court's own reasoning; the Tatbestand and any indirect speech ("habe", "sei", "bestehe", "meint", "trägt vor") are the parties speaking. Where the extract does not settle it, read the full decision or describe it as the party's contention. Never state a Minderungsquote as a court's holding because the figure appears somewhere in the document.
 - Never invent a figure. If the sources you fetched do not give a percentage, say that the decisions you could read do not state one, rather than supplying a plausible number.
 - State which source you searched. Open Legal Data is free and its coverage is INCOMPLETE — it is not Beck-Online or juris. If a search returns nothing, say that nothing was found in the searched free database, never that no such case law exists. Where a matter is important, tell the user that a Beck-Online or juris search is still needed for a complete picture.
 - The [N] markers and the <CITATIONS> block are ONLY for documents the user uploaded to this chat. Never use them for statutes or court decisions: cite legal sources inline in prose as described above, with the court, Aktenzeichen, date and URL written out. Emitting a [N] marker for a decision produces a citation that points at nothing.
@@ -494,7 +494,7 @@ export const LEGAL_RESEARCH_TOOLS = [
         function: {
             name: "search_case_law",
             description:
-                "Full-text search of German court decisions in the free Open Legal Data corpus (de.openlegaldata.io). Use this whenever the answer depends on how courts have actually decided a question, or when the user asks for current case law. Returns matching decisions with highlighted snippets. IMPORTANT: this corpus is free and INCOMPLETE — it is not Beck-Online or juris. Never present an empty or thin result as proof that no case law exists.",
+                "Full-text search of German court decisions in the free Open Legal Data corpus (de.openlegaldata.io). Use this whenever the answer depends on how courts have actually decided a question, or when the user asks for current case law. Each hit is read for you automatically: the result carries the court, the file number (Aktenzeichen), the ECLI, the date, a source URL and an extract of the decision around the search hit, so you can cite the decisions it returns without any further call. IMPORTANT: this corpus is free and INCOMPLETE — it is not Beck-Online or juris. Never present an empty or thin result as proof that no case law exists.",
             parameters: {
                 type: "object",
                 properties: {
@@ -530,7 +530,8 @@ export const LEGAL_RESEARCH_TOOLS = [
                     },
                     limit: {
                         type: "integer",
-                        description: "How many decisions to return (1-10, default 5).",
+                        description:
+                            "How many decisions to return (1-5, default 3). Each is fetched in full, so keep this small.",
                     },
                 },
                 required: ["query"],
@@ -542,7 +543,7 @@ export const LEGAL_RESEARCH_TOOLS = [
         function: {
             name: "fetch_case",
             description:
-                "Read one court decision in full, by the case_id returned from search_case_law. Returns the court, the file number (Aktenzeichen), the ECLI, the decision date, a source URL and the decision text. You MUST call this before citing a decision — the file number needed for a proper citation is not in the search results.",
+                "Read one court decision in full, by the case_id returned from search_case_law. Search results already include the citation details and an extract, so use this only when you need more of the decision than the extract shows — for example to check whether a passage is the court's reasoning or a party's submission.",
             parameters: {
                 type: "object",
                 properties: {

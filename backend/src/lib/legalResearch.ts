@@ -149,11 +149,29 @@ export type CaseSearchParams = {
     limit?: number;
 };
 
+/** How many hits get their full record fetched automatically. */
+const MAX_ENRICHED = 5;
+const EXCERPT_RADIUS = 1500;
+
+/**
+ * Cuts a window of the decision text around the first search hit, so the model
+ * sees the match in context rather than a bare fragment.
+ */
+function excerptAround(text: string, snippet: string): string {
+    if (!text) return "";
+    const needle = snippet.slice(0, 60).trim();
+    const at = needle ? text.indexOf(needle) : -1;
+    if (at < 0) return text.slice(0, EXCERPT_RADIUS * 2);
+    const from = Math.max(0, at - EXCERPT_RADIUS);
+    const to = Math.min(text.length, at + EXCERPT_RADIUS);
+    return `${from > 0 ? "[…] " : ""}${text.slice(from, to)}${to < text.length ? " […]" : ""}`;
+}
+
 export async function searchCaseLaw(params: CaseSearchParams) {
     const query = (params.query ?? "").trim();
     if (!query) return { error: "A search query is required." };
 
-    const limit = Math.min(Math.max(params.limit ?? 5, 1), 10);
+    const limit = Math.min(Math.max(params.limit ?? 3, 1), MAX_ENRICHED);
     const qs = new URLSearchParams({ text: query, page_size: String(limit) });
     if (params.date_from) qs.set("start_date", params.date_from);
     if (params.date_to) qs.set("end_date", params.date_to);
@@ -173,24 +191,55 @@ export async function searchCaseLaw(params: CaseSearchParams) {
     );
     if (isError(data)) return data;
 
+    // Every hit is fetched immediately. Search alone yields fragments with no
+    // court, date or file number, and a model handed those will attribute a
+    // holding to a court it never read; doing the fetch here means the only
+    // case material it ever sees is a real, citable record.
+    const hits = data.results ?? [];
+    const enriched = await Promise.all(
+        hits.map(async (r) => {
+            const snippets = (r.snippets ?? []).map((sn: any) =>
+                cleanSnippet(sn.text ?? ""),
+            );
+            const full = await fetchCase(r.id);
+            if (isError(full)) {
+                return {
+                    case_id: r.id,
+                    court_level: r.court_level_of_appeal,
+                    decision_type: r.decision_type,
+                    snippets,
+                    citable: false,
+                    note: `This decision could not be read (${full.error}). Do not cite it, and do not attribute anything in the snippets to a court.`,
+                };
+            }
+            return {
+                case_id: full.case_id,
+                court: full.court,
+                file_number: full.file_number,
+                ecli: full.ecli,
+                date: full.date,
+                decision_type: full.decision_type,
+                court_level: r.court_level_of_appeal,
+                citing_cases_count: r.citing_cases_count,
+                url: full.url,
+                citable: true,
+                matched_snippets: snippets,
+                excerpt: excerptAround(full.text, snippets[0] ?? ""),
+                excerpt_note:
+                    "An extract around the search hit, not the whole decision. Text here may be a party's submission rather than the court's holding — check that before presenting anything as decided, and read the full decision if the extract does not make it clear.",
+            };
+        }),
+    );
+
     return {
         source: "Open Legal Data (de.openlegaldata.io)",
         coverage_note:
             "Open Legal Data covers courts at ALL levels — Amtsgericht, Landgericht, Oberlandesgericht and the federal courts — but its coverage of each is incomplete. Do not describe it as excluding any court level; describe it as a free database whose coverage is partial. Absence of a hit is NOT evidence that no such case law exists — say so rather than concluding none exists.",
-        total_matches: data.count ?? 0,
-        returned: (data.results ?? []).length,
         how_to_use:
-            "These are search hits, not findings. The snippets are fragments of the decision text and may be a party's submission rather than the court's holding, so they establish nothing on their own. The court's name and the decision date are deliberately NOT included here: call fetch_case on each decision you intend to mention, and take the court, file number, date and holding from that result.",
-        results: (data.results ?? []).map((r) => ({
-            case_id: r.id,
-            court_jurisdiction: r.court_jurisdiction,
-            court_level: r.court_level_of_appeal,
-            decision_type: r.decision_type,
-            citing_cases_count: r.citing_cases_count,
-            snippets: (r.snippets ?? []).map((s: any) => cleanSnippet(s.text ?? "")),
-            citable: false,
-            note: "NOT citable from here. Call fetch_case with this case_id to obtain the court, Aktenzeichen, date, URL and full text.",
-        })),
+            "Each result below has already been read for you: court, file number, date and an extract of the decision are included, so you can cite these decisions directly without any further call. Cite as court, Aktenzeichen and date. Use fetch_case only when you need more of a decision than the extract shows.",
+        total_matches: data.count ?? 0,
+        returned: enriched.length,
+        results: enriched,
     };
 }
 

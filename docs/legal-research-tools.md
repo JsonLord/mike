@@ -107,19 +107,32 @@ the source it searched, to report an empty result as "nothing found in the
 searched free database" rather than "no such case law exists", and to note that
 a Beck-Online or juris search is still needed where the matter is important.
 
-Search results deliberately omit the **court name, the date and the file
-number**. All three come only from `fetch_case`, so a citation cannot be
-assembled from search output at all — the model has to read the decision before
-it can name it. Results are marked `citable: false` and carry a `how_to_use`
-note saying the snippets establish nothing on their own.
+**`search_case_law` fetches every hit it returns.** Each result carries the
+court, Aktenzeichen, ECLI, date, source URL and a ~3,000-character extract
+of the decision anchored on the search hit, marked `citable: true`. Three
+results take about 1.7s.
 
-This was tightened after a production answer cited five decisions without a
-single `fetch_case` call, inventing one Minderungsquote outright and presenting
-two figures from parties' submissions as courts' holdings. Prose instruction
-alone did not hold; withholding the data does. The prompt additionally requires
-the model to check that a figure appears in the Tenor or Entscheidungsgründe
-rather than in a party's contention, and forbids using the `[N]`/`<CITATIONS>`
-document mechanism for legal sources.
+This design was reached the hard way. Three production answers, in order:
+
+1. Search results included the court and date; the model cited five decisions
+   without reading any, invented one Minderungsquote outright, and passed two
+   figures from parties' submissions off as holdings.
+2. Court and date were withheld so a citation could not be assembled without
+   fetching. The model stopped citing falsely — and stopped answering, ending
+   its turn to ask permission to read the decisions.
+3. The prompt was changed to require fetching and forbid asking. The model
+   still did not fetch, and one misattributed figure returned.
+
+Prose instruction failed twice on the same behaviour, so the fetch moved
+server-side: there is no longer an unfetched state for the model to reason
+from. `fetch_case` remains for reading beyond the extract — for instance to
+check whether a passage is the court's reasoning or a party's submission.
+
+The prompt still carries the rules the data cannot enforce: that a figure must
+stand in the Tenor or Entscheidungsgründe rather than in indirect speech from
+the Tatbestand, that no figure may be supplied where the sources give none, and
+that the `[N]`/`<CITATIONS>` document mechanism is never used for legal
+sources.
 
 ## Observability
 
