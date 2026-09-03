@@ -109,6 +109,22 @@ decision, so citations come from the record rather than from a snippet.
 The prompt requires the form: court, Aktenzeichen, date — e.g.
 "OLG Köln, Urteil v. 17.09.2025 – 11 U 125/23" — plus ECLI and source URL.
 
+## Observability
+
+Every research tool call logs one line — tool, arguments, which source
+answered or the error, and how long it took:
+
+```
+[legal] search_case_law {"query":"Mietminderung Schimmel","limit":2} -> via Open Legal Data, 62 matches (772ms)
+[legal] fetch_statute {"book":"bgb","section":"242"} -> via gesetze-im-internet.de (670ms)
+[legal] fetch_case {"case_id":"bad"} -> error: case_id must be the numeric id … (0ms)
+```
+
+A fallback to the statute mirror is marked `NON-AUTHORITATIVE`. Together with
+the startup `[sources]` lines this makes two otherwise invisible questions
+answerable from the deployment's logs: whether the model is calling the tools
+at all, and which source actually served each answer.
+
 ## Failure behaviour
 
 Both sources are third-party. Every lookup runs under a timeout (15s search,

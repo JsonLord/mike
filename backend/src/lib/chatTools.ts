@@ -2094,6 +2094,7 @@ export async function runToolCalls(
             // so the turn continues and the model can say what it could not
             // verify.
             let result: unknown;
+            const startedAt = Date.now();
             try {
                 if (tc.function.name === "search_case_law") {
                     result = await searchCaseLaw({
@@ -2141,6 +2142,30 @@ export async function runToolCalls(
                     error: `Legal research lookup failed: ${err instanceof Error ? err.message : String(err)}`,
                 };
             }
+            // One line per research call: which tool, what was asked, and what
+            // came back. Without it the deployment's logs cannot tell whether
+            // the model is using these tools at all, or which source answered.
+            const r = result as {
+                error?: string;
+                source?: string;
+                total_matches?: number;
+                authoritative?: boolean;
+            };
+            const outcome = r?.error
+                ? `error: ${r.error.slice(0, 90)}`
+                : [
+                      r?.source ? `via ${r.source}` : "ok",
+                      typeof r?.total_matches === "number"
+                          ? `${r.total_matches} matches`
+                          : null,
+                      r?.authoritative === false ? "NON-AUTHORITATIVE" : null,
+                  ]
+                      .filter(Boolean)
+                      .join(", ");
+            console.log(
+                `[legal] ${tc.function.name} ${JSON.stringify(args).slice(0, 120)} -> ${outcome} (${Date.now() - startedAt}ms)`,
+            );
+
             toolResults.push({
                 role: "tool",
                 tool_call_id: tc.id,
