@@ -88,9 +88,9 @@ export function AssistantWorkflowModal({
     }
 
     return createPortal(
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/10 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/10 backdrop-blur-xs p-4">
             <div
-                className={`w-full rounded-2xl bg-white shadow-2xl flex flex-col h-[600px] ${selected ? "max-w-4xl" : "max-w-2xl"}`}
+                className={`w-full rounded-2xl bg-white shadow-2xl flex flex-col h-[min(600px,85vh)] ${selected ? "max-w-[min(56rem,92vw)]" : "max-w-[min(42rem,92vw)]"}`}
             >
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-4 shrink-0 border-b border-gray-100">
