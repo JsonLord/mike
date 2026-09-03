@@ -13,6 +13,7 @@ import { workflowsRouter } from "./routes/workflows";
 import { userRouter } from "./routes/user";
 import { configRouter } from "./routes/config";
 import { warmOfficialDecisionIndex } from "./lib/officialDecisions";
+import { probeLegalSources } from "./lib/sourceHealth";
 import { downloadsRouter } from "./routes/downloads";
 
 const app = express();
@@ -167,4 +168,6 @@ app.listen(PORT, () => {
   // chat does not pay for the ~23 MB download. Failures are logged, not fatal:
   // the tools rebuild on demand and report their own unavailability.
   warmOfficialDecisionIndex();
+  // Log which research sources this deployment can actually reach.
+  void probeLegalSources().catch(() => {});
 });

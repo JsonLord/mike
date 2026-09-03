@@ -34,7 +34,7 @@ const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 const CACHE_FILE = path.join(DATA_DIR, "cache", "rii-index.json");
 
 const INDEX_TTL_MS = 24 * 60 * 60 * 1000;
-const TOC_TIMEOUT_MS = 180000;
+const TOC_TIMEOUT_MS = 120000;
 const DOC_TIMEOUT_MS = 30000;
 const MAX_DECISION_CHARS = 40000;
 
@@ -53,6 +53,15 @@ type IndexCache = { built_at: number; entries: IndexEntry[] };
 
 let index: IndexCache | null = null;
 let building: Promise<IndexCache | null> | null = null;
+let lastFailureAt = 0;
+
+/**
+ * After a failed build, stop trying for a while. Without this, every tool call
+ * would sit through another connect timeout before reporting the source is
+ * unavailable, and a chat turn would hang on a source that is simply not
+ * reachable from this deployment.
+ */
+const FAILURE_BACKOFF_MS = 10 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Index construction
@@ -163,6 +172,7 @@ async function buildIndex(): Promise<IndexCache | null> {
 async function getIndex(): Promise<IndexCache | null> {
     if (isFresh(index)) return index;
     if (building) return building;
+    if (!index && Date.now() - lastFailureAt < FAILURE_BACKOFF_MS) return null;
 
     building = (async () => {
         const cached = await readCache();
@@ -171,6 +181,7 @@ async function getIndex(): Promise<IndexCache | null> {
             return index;
         }
         const built = await buildIndex();
+        if (!built) lastFailureAt = Date.now();
         // Fall back to whatever we have rather than failing outright.
         index = built ?? cached ?? index;
         return index;
@@ -225,7 +236,7 @@ export async function searchOfficialDecisions(params: OfficialSearchParams) {
     const idx = await getIndex();
     if (!idx) {
         return {
-            error: "The official decision index (rechtsprechung-im-internet.de) is not available right now. Say that you could not check the official source, and do not present this as an absence of decisions.",
+            error: "The official decision index (rechtsprechung-im-internet.de) is not reachable from this deployment. Tell the user you could not check the official federal-courts source, and fall back to search_case_law. Do NOT present this as an absence of decisions.",
         };
     }
 
