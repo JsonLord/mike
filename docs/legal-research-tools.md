@@ -54,6 +54,37 @@ File-number matching is normalized and partial, so `1 BvR` matches the whole
 register and `VIa ZR 17/23` finds the single decision. Court names accept
 abbreviations or full names (`BGH`, `Bundesgerichtshof`).
 
+## Reachability differs by deployment
+
+Outbound access is not the same everywhere, and this is measured rather than
+assumed: `probeLegalSources()` runs at startup, probes each source and performs
+one real statute lookup, logging the result. On the Hugging Face Space:
+
+```
+[sources] reachable:   openlegaldata (case law search) — HTTP 200 (456ms)
+[sources] UNREACHABLE: gesetze-im-internet (statutes)  — UND_ERR_CONNECT_TIMEOUT
+[sources] UNREACHABLE: rechtsprechung-im-internet      — UND_ERR_CONNECT_TIMEOUT
+```
+
+Both German-government-hosted services refuse connections from that network
+(TCP connect timeout, not DNS or TLS); the Cloudflare-fronted Open Legal Data
+works. Consequences:
+
+- **Statutes still work.** `fetch_statute` tries gesetze-im-internet first and,
+  on a network-level failure, falls back to Open Legal Data's mirror of the same
+  text, resolved through a per-book section index (`book__latest=true`, paged
+  and cached in memory). The payload then carries `authoritative: false`, the
+  `official_url`, and `mirror_last_updated`; the prompt requires the assistant
+  to say the wording came from a mirror and to give the official URL.
+- **The official decision index does not.** `search_official_decisions` returns
+  a clear unavailability message and the prompt tells the assistant to fall back
+  to `search_case_law` and never to read it as an absence of decisions. After a
+  failed build the index backs off for ten minutes, so a call returns
+  immediately instead of hanging a chat turn on a connect timeout.
+
+The official-source code is correct and works wherever the host is reachable —
+it is the deployment's egress, not the implementation, that limits it.
+
 ## Which source wins
 
 The prompt tells the assistant to use Open Legal Data to *find* decisions by

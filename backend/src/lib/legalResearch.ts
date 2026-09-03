@@ -11,6 +11,11 @@
  *  - Open Legal Data (de.openlegaldata.io): a free, community-run corpus of
  *    German court decisions with full text and a full-text search API.
  *
+ * Not every deployment can reach every source: gesetze-im-internet.de refuses
+ * connections from some hosting networks (the Hugging Face Space this runs on
+ * among them), so fetch_statute falls back to Open Legal Data's mirror of the
+ * same text and says plainly which of the two answered.
+ *
  * Neither is a substitute for Beck-Online or juris: Open Legal Data's coverage
  * is partial, so callers must never present an empty result as proof that no
  * case law exists. The tool descriptions and the system prompt say so, and the
@@ -261,6 +266,71 @@ function statuteUrls(book: string, section: string): string[] {
     return [`${GII}/${b}/__${s}.html`, `${GII}/${b}/art_${s}.html`];
 }
 
+/**
+ * Section-slug → Open Legal Data law id, per statute book.
+ *
+ * The API offers no filter by section, so the book's current revision is paged
+ * once and indexed in memory. Books run to a few thousand sections, so this is
+ * three requests for the BGB and one for most others.
+ */
+const lawIdCache = new Map<string, Map<string, number>>();
+
+const OLD_PAGE_SIZE = 1000;
+const OLD_MAX_PAGES = 8;
+
+async function lawIdsForBook(bookSlug: string): Promise<Map<string, number> | null> {
+    const cached = lawIdCache.get(bookSlug);
+    if (cached) return cached;
+
+    const map = new Map<string, number>();
+    for (let page = 0; page < OLD_MAX_PAGES; page++) {
+        const url = `${OLD_API}/laws/?book__slug=${encodeURIComponent(bookSlug)}&book__latest=true&limit=${OLD_PAGE_SIZE}&offset=${page * OLD_PAGE_SIZE}`;
+        const data = await getJson<{ count: number; results: any[] }>(url, SEARCH_TIMEOUT_MS);
+        if (isError(data)) return map.size ? map : null;
+        for (const r of data.results ?? []) {
+            if (r?.slug && typeof r.id !== "undefined" && !map.has(r.slug)) {
+                map.set(String(r.slug), Number(r.id));
+            }
+        }
+        if ((page + 1) * OLD_PAGE_SIZE >= (data.count ?? 0)) break;
+    }
+    if (!map.size) return null;
+    lawIdCache.set(bookSlug, map);
+    return map;
+}
+
+/** Reads the provision from Open Legal Data when the official service is unreachable. */
+async function fetchStatuteFromMirror(book: string, section: string) {
+    const bookSlug = book.trim().toLowerCase().replace(/\s+/g, "");
+    const sec = normalizeSection(section);
+    const ids = await lawIdsForBook(bookSlug);
+    if (!ids) return null;
+
+    // §-numbered laws key on the bare number; article-numbered ones on artikel-N.
+    const id = ids.get(sec) ?? ids.get(`artikel-${sec}`) ?? ids.get(`art-${sec}`);
+    if (typeof id !== "number") return null;
+
+    const data = await getJson<any>(`${OLD_API}/laws/${id}/`, FETCH_TIMEOUT_MS);
+    if (isError(data)) return null;
+
+    const text = stripTags(String(data.content ?? ""));
+    if (!text) return null;
+
+    return {
+        source: "Open Legal Data mirror of gesetze-im-internet.de",
+        authoritative: false,
+        law: data.book_code ? `${data.book_code}` : bookSlug.toUpperCase(),
+        section: data.section ?? section,
+        heading: data.title ?? "",
+        text,
+        url: `${OLD_WEB}/law/${bookSlug}/${data.slug ?? sec}/`,
+        official_url: statuteUrls(book, section)[0],
+        mirror_last_updated: data.updated_date ?? null,
+        currency_note:
+            "The official service gesetze-im-internet.de was not reachable from this deployment, so this is a MIRROR of the official text, last updated as given in mirror_last_updated. Tell the user the wording comes from a mirror and should be confirmed against the official URL before it is relied on.",
+    };
+}
+
 export async function fetchStatute(params: { book: string; section: string }) {
     const book = (params.book ?? "").trim();
     const section = (params.section ?? "").trim();
@@ -269,10 +339,16 @@ export async function fetchStatute(params: { book: string; section: string }) {
     }
 
     const attempted: string[] = [];
+    let officialUnreachable = false;
     for (const url of statuteUrls(book, section)) {
         attempted.push(url);
         const got = await httpGet(url, FETCH_TIMEOUT_MS);
-        if (!got.ok) return { error: got.error };
+        if (!got.ok) {
+            // Network-level failure: this deployment cannot reach the official
+            // service at all, so stop trying URL forms and use the mirror.
+            officialUnreachable = true;
+            break;
+        }
         if (got.res.status === 404) continue;
         if (!got.res.ok) {
             return { error: `gesetze-im-internet.de returned HTTP ${got.res.status}.` };
@@ -296,6 +372,14 @@ export async function fetchStatute(params: { book: string; section: string }) {
         };
     }
 
+    const mirrored = await fetchStatuteFromMirror(book, section);
+    if (mirrored) return mirrored;
+
+    if (officialUnreachable) {
+        return {
+            error: `gesetze-im-internet.de is not reachable from this deployment and the provision was not found in the mirror either. Tell the user you could not verify the wording of this provision, and do not quote it from memory as if you had.`,
+        };
+    }
     return {
         error: `No such provision found. Tried: ${attempted.join(", ")}. Check the law abbreviation (the slug used by gesetze-im-internet.de, e.g. 'bgb', 'stgb', 'hgb', 'gg') and the section number, or use search_statutes to locate it.`,
     };

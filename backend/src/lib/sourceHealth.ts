@@ -9,6 +9,8 @@
  * deployment's logs.
  */
 
+import { fetchStatute } from "./legalResearch";
+
 const PROBES: { name: string; url: string; ua?: string }[] = [
     {
         name: "openlegaldata (case law search)",
@@ -85,5 +87,24 @@ export async function probeLegalSources(): Promise<SourceStatus[]> {
             `[sources] ${r.ok ? "reachable" : "UNREACHABLE"}: ${r.name} — ${r.detail} (${r.ms}ms)`,
         );
     }
+
+    // Reachability is not the same as a working lookup: statute reads fall back
+    // to a mirror when the official service is blocked, so exercise one and log
+    // which source actually answered.
+    try {
+        const probe = (await fetchStatute({ book: "bgb", section: "242" })) as {
+            error?: string;
+            source?: string;
+            authoritative?: boolean;
+        };
+        console.log(
+            probe.error
+                ? `[sources] statute lookup FAILED: ${probe.error.slice(0, 120)}`
+                : `[sources] statute lookup OK via ${probe.source} (authoritative: ${probe.authoritative !== false})`,
+        );
+    } catch (err) {
+        console.error("[sources] statute lookup probe threw", err);
+    }
+
     return results;
 }
