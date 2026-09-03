@@ -107,11 +107,19 @@ the source it searched, to report an empty result as "nothing found in the
 searched free database" rather than "no such case law exists", and to note that
 a Beck-Online or juris search is still needed where the matter is important.
 
-Search results deliberately omit the file number, which is only available from
-`fetch_case`. This forces the model through a fetch before it can cite a
-decision, so citations come from the record rather than from a snippet.
-The prompt requires the form: court, Aktenzeichen, date — e.g.
-"OLG Köln, Urteil v. 17.09.2025 – 11 U 125/23" — plus ECLI and source URL.
+Search results deliberately omit the **court name, the date and the file
+number**. All three come only from `fetch_case`, so a citation cannot be
+assembled from search output at all — the model has to read the decision before
+it can name it. Results are marked `citable: false` and carry a `how_to_use`
+note saying the snippets establish nothing on their own.
+
+This was tightened after a production answer cited five decisions without a
+single `fetch_case` call, inventing one Minderungsquote outright and presenting
+two figures from parties' submissions as courts' holdings. Prose instruction
+alone did not hold; withholding the data does. The prompt additionally requires
+the model to check that a figure appears in the Tenor or Entscheidungsgründe
+rather than in a party's contention, and forbids using the `[N]`/`<CITATIONS>`
+document mechanism for legal sources.
 
 ## Observability
 

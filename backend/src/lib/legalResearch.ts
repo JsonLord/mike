@@ -179,17 +179,17 @@ export async function searchCaseLaw(params: CaseSearchParams) {
             "Free, partial corpus of German decisions. Absence of a hit is NOT evidence that no such case law exists — say so rather than concluding none exists.",
         total_matches: data.count ?? 0,
         returned: (data.results ?? []).length,
+        how_to_use:
+            "These are search hits, not findings. The snippets are fragments of the decision text and may be a party's submission rather than the court's holding, so they establish nothing on their own. The court's name and the decision date are deliberately NOT included here: call fetch_case on each decision you intend to mention, and take the court, file number, date and holding from that result.",
         results: (data.results ?? []).map((r) => ({
             case_id: r.id,
-            court: r.court,
             court_jurisdiction: r.court_jurisdiction,
             court_level: r.court_level_of_appeal,
-            date: r.date,
             decision_type: r.decision_type,
             citing_cases_count: r.citing_cases_count,
-            url: `${OLD_WEB}/case/${r.slug}`,
             snippets: (r.snippets ?? []).map((s: any) => cleanSnippet(s.text ?? "")),
-            note: "Call fetch_case with this case_id before citing it — the file number (Aktenzeichen) is only available there.",
+            citable: false,
+            note: "NOT citable from here. Call fetch_case with this case_id to obtain the court, Aktenzeichen, date, URL and full text.",
         })),
     };
 }
@@ -325,7 +325,7 @@ async function fetchStatuteFromMirror(book: string, section: string) {
     if (!text) return null;
 
     return {
-        source: "Open Legal Data mirror of gesetze-im-internet.de",
+        source: "Open Legal Data (de.openlegaldata.io) — an INDEPENDENT community-run copy, NOT operated by the German government",
         authoritative: false,
         law: data.book_code ? `${data.book_code}` : bookSlug.toUpperCase(),
         section: data.section ?? section,
@@ -335,7 +335,7 @@ async function fetchStatuteFromMirror(book: string, section: string) {
         official_url: statuteUrls(book, section)[0],
         mirror_last_updated: data.updated_date ?? null,
         currency_note:
-            "The official service gesetze-im-internet.de was not reachable from this deployment, so this is a MIRROR of the official text, last updated as given in mirror_last_updated. Tell the user the wording comes from a mirror and should be confirmed against the official URL before it is relied on.",
+            "The official service gesetze-im-internet.de was not reachable from this deployment, so this wording comes from Open Legal Data's independent copy of it, last updated as given in mirror_last_updated. It is a third-party copy run by a community project — NEVER describe it as an official, government, or Bundesregierung source. Tell the user the wording comes from a third-party copy and must be confirmed against the official URL before it is relied on.",
     };
 }
 
@@ -426,7 +426,11 @@ function parseStatutePage(html: string): {
     const tagEnd = html.indexOf(">", anchor);
     const from = tagEnd > anchor ? tagEnd + 1 : anchor;
     const footer = html.search(/id="fussz/i);
-    const text = stripTags(html.slice(from, footer > from ? footer : undefined));
+    const text = stripTags(
+        // The footer index can land inside a tag; drop the fragment so no
+        // markup leaks into the statute text handed to the model.
+        html.slice(from, footer > from ? footer : undefined).replace(/<[^>]*$/, ""),
+    );
 
     if (!text) return null;
     return { law, section, heading, text };
