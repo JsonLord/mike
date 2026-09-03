@@ -28,6 +28,10 @@ import {
     searchStatutes,
 } from "./legalResearch";
 import {
+    fetchOfficialDecision,
+    searchOfficialDecisions,
+} from "./officialDecisions";
+import {
     streamChatWithTools,
     resolveModel,
     defaultMainModel,
@@ -146,8 +150,10 @@ The chat-local labels ("doc-0", "doc-1", "doc-N", …) are internal handles for 
 LEGAL RESEARCH (German law):
 You can look up German statutes and court decisions with search_statutes, fetch_statute, search_case_law and fetch_case. Use them — do not answer from memory when the answer turns on the current wording of a provision or on how courts have decided a question. Your training data has a cutoff; these tools do not.
 - Statutes: gesetze-im-internet.de, the official consolidated federal text, i.e. the version in force today. Call fetch_statute before quoting or relying on a provision. If you are unsure which provision applies, call search_statutes first, then confirm the wording with fetch_statute. Never quote a provision from a search snippet or from memory. This source has no historic versions: if the user needs the text in force at an earlier date, say so plainly.
-- Case law: the free Open Legal Data corpus. To find the case law on a specific provision, use search_case_law with cites_law_book and cites_law_section. For recent decisions, set date_from or order_by "date".
-- NEVER cite a decision from search snippets alone. Call fetch_case first and cite it as: court, file number (Aktenzeichen), and decision date — e.g. "OLG Köln, Urteil v. 17.09.2025 – 11 U 125/23". Add the ECLI when one is returned, and give the source URL.
+- Case law, two sources with different strengths. Open Legal Data (search_case_law, fetch_case) covers all court levels and is the only one you can search by subject matter — use it to find decisions on a topic, optionally with cites_law_book and cites_law_section to get the case law on a specific provision, or date_from / order_by "date" for recent decisions. rechtsprechung-im-internet.de (search_official_decisions, fetch_official_decision) is the official service of the federal courts (BGH, BVerfG, BVerwG, BFH, BAG, BSG, BPatG, 2010 to today); it searches metadata only — court, date, file number — so use it to look up or verify a decision you can already name, and to read the authoritative text.
+- Whenever a decision is from a federal court, prefer the official source: after finding it via search_case_law, look it up with search_official_decisions (by court and file number) and read it with fetch_official_decision. Where the two sources differ, the official text governs. If the user gives you a citation to check, go straight to search_official_decisions.
+- The official index holds no Land or instance-court decisions (LG, AG, OLG, VG …), so not finding one there says nothing about whether it exists — for those, Open Legal Data is the only source you have.
+- NEVER cite a decision from search snippets alone. Call fetch_case or fetch_official_decision first and cite it as: court, file number (Aktenzeichen), and decision date — e.g. "OLG Köln, Urteil v. 17.09.2025 – 11 U 125/23". Add the ECLI when one is returned, and give the source URL.
 - State which source you searched. Open Legal Data is free and its coverage is INCOMPLETE — it is not Beck-Online or juris. If a search returns nothing, say that nothing was found in the searched free database, never that no such case law exists. Where a matter is important, tell the user that a Beck-Online or juris search is still needed for a complete picture.
 - If a lookup fails or a source is unreachable, say what you could not verify. Never invent a decision, a file number, an ECLI, or statutory wording, and never present remembered law as a tool result.
 
@@ -566,6 +572,61 @@ export const LEGAL_RESEARCH_TOOLS = [
                     },
                 },
                 required: ["query"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "search_official_decisions",
+            description:
+                "Search the OFFICIAL decision service of the German federal courts (rechtsprechung-im-internet.de, Bundesamt für Justiz): BGH, BVerfG, BVerwG, BFH, BAG, BSG, BPatG, from 2010 to today. This index covers METADATA ONLY — court, date, file number — so use it to find or verify a decision you can already name, and use search_case_law for full-text searching by subject matter. It contains no Land or instance-court decisions. Prefer this source over search_case_law whenever you are dealing with a decision of a federal court, because it is the authoritative text.",
+            parameters: {
+                type: "object",
+                properties: {
+                    court: {
+                        type: "string",
+                        description:
+                            "Court, e.g. 'BGH', 'BVerfG', 'BAG', or the full name such as 'Bundesgerichtshof'.",
+                    },
+                    file_number: {
+                        type: "string",
+                        description:
+                            "File number (Aktenzeichen), e.g. 'VIII ZR 56/25'. Partial values match, so '1 BvR' finds all decisions in that register.",
+                    },
+                    date_from: {
+                        type: "string",
+                        description: "Only decisions on or after this date (YYYY-MM-DD).",
+                    },
+                    date_to: {
+                        type: "string",
+                        description: "Only decisions on or before this date (YYYY-MM-DD).",
+                    },
+                    limit: {
+                        type: "integer",
+                        description: "How many decisions to return (1-20, default 5).",
+                    },
+                },
+                required: [],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "fetch_official_decision",
+            description:
+                "Read the official text of a federal court decision by the decision_id returned from search_official_decisions. Returns the court and senate, the file number, the ECLI, the date, the norms applied, the Leitsatz where one exists, and the Tenor plus Entscheidungsgründe. This is the authoritative record — prefer it over fetch_case when both cover the same decision.",
+            parameters: {
+                type: "object",
+                properties: {
+                    decision_id: {
+                        type: "string",
+                        description:
+                            "Document number from search_official_decisions, e.g. 'KORE610822026'.",
+                    },
+                },
+                required: ["decision_id"],
             },
         },
     },
@@ -2023,7 +2084,9 @@ export async function runToolCalls(
             tc.function.name === "search_case_law" ||
             tc.function.name === "fetch_case" ||
             tc.function.name === "search_statutes" ||
-            tc.function.name === "fetch_statute"
+            tc.function.name === "fetch_statute" ||
+            tc.function.name === "search_official_decisions" ||
+            tc.function.name === "fetch_official_decision"
         ) {
             // Research sources are third-party and can be slow or down; a
             // failure is reported back to the model as a result, never thrown,
@@ -2053,11 +2116,23 @@ export async function runToolCalls(
                         book_code: args.book_code as string | undefined,
                         limit: Number(args.limit) || undefined,
                     });
-                } else {
+                } else if (tc.function.name === "fetch_statute") {
                     result = await fetchStatute({
                         book: String(args.book ?? ""),
                         section: String(args.section ?? ""),
                     });
+                } else if (tc.function.name === "search_official_decisions") {
+                    result = await searchOfficialDecisions({
+                        court: args.court as string | undefined,
+                        file_number: args.file_number as string | undefined,
+                        date_from: args.date_from as string | undefined,
+                        date_to: args.date_to as string | undefined,
+                        limit: Number(args.limit) || undefined,
+                    });
+                } else {
+                    result = await fetchOfficialDecision(
+                        String(args.decision_id ?? ""),
+                    );
                 }
             } catch (err) {
                 console.error(`[${tc.function.name}]`, err);

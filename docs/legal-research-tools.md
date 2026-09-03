@@ -11,6 +11,8 @@ chat, tabular-review chat) in `backend/src/lib/chatTools.ts`, implemented in
 | `fetch_statute` | gesetze-im-internet.de (BMJ) | Official consolidated wording currently in force |
 | `search_case_law` | Open Legal Data | Decisions with highlighted snippets |
 | `fetch_case` | Open Legal Data | Full decision, file number, ECLI, date, source URL |
+| `search_official_decisions` | rechtsprechung-im-internet.de | Federal decisions by court / file number / date |
+| `fetch_official_decision` | rechtsprechung-im-internet.de | Official text: Tenor, Gründe, Leitsatz, ECLI, norms |
 
 ## Sources
 
@@ -29,6 +31,38 @@ the plain `/api/cases/` list endpoint is silently ignored and must not be used).
 Supported filters: `start_date`, `end_date`, `court`, `order_by`
 (`relevance` | `date` | `most_cited`), and `cited_law_book` + `cited_law_section`,
 which finds the decisions citing a given provision.
+
+**rechtsprechung-im-internet.de** — the official service of the Bundesamt für
+Justiz, implemented in `backend/src/lib/officialDecisions.ts`. It has no search
+API, so the service's index of every decision (`rii-toc.xml`, ~23 MB, 84,130
+entries carrying court, date, file number and link) is downloaded and parsed
+into a local index, cached at `$DATA_DIR/cache/rii-index.json` (~6.9 MB) and
+rebuilt when older than 24 hours. `warmOfficialDecisionIndex()` starts the first
+build in the background from `index.ts` after `listen()`, so the server answers
+requests immediately (health responds at +0.6s; the index lands at ~+5.6s) and
+the first chat lookup does not pay for the download. Concurrent callers share
+one build, and a stale index is preferred over none if a rebuild fails.
+
+The service returns an **empty body to clients that do not send a browser
+`User-Agent`** — this is why an early probe of it appeared to fail. Decisions
+are served as zipped XML and unpacked with JSZip (already a dependency).
+
+Coverage: BGH, BVerfG, BVerwG, BFH, BAG, BSG, BPatG, 2010-01-04 to the present,
+federal courts only. The index is metadata (court, date, file number), so it
+cannot be searched by subject matter — that is what Open Legal Data is for.
+File-number matching is normalized and partial, so `1 BvR` matches the whole
+register and `VIa ZR 17/23` finds the single decision. Court names accept
+abbreviations or full names (`BGH`, `Bundesgerichtshof`).
+
+## Which source wins
+
+The prompt tells the assistant to use Open Legal Data to *find* decisions by
+subject matter, then — whenever the decision is from a federal court — to look
+it up in the official index by court and file number and read the authoritative
+text. Where the two differ, the official text governs. A citation the user hands
+over goes straight to `search_official_decisions`. Because the official index
+holds no Land or instance-court decisions, the prompt also states that a miss
+there says nothing about whether such a decision exists.
 
 ## Coverage limits — deliberately surfaced, not hidden
 
@@ -57,9 +91,8 @@ could not verify rather than failing the turn.
 terms prohibit automated retrieval. Integrating them requires a commercial
 agreement with the publisher, not a code change.
 
-**rechtsprechung-im-internet.de** (the official federal-courts service, ~84,000
-decisions from BGH, BVerwG, BFH, BAG, BSG, BPatG) is reachable and usable —
-it requires a browser `User-Agent`, serves a 23 MB `rii-toc.xml` index of every
-decision, and returns each decision as a zipped XML document. It offers no
-search API, so using it means building and refreshing a local index of that
-TOC. That is a separate piece of work from the tools above.
+**Full-text search of the official corpus.** The official service exposes no
+text index, and the TOC carries metadata only, so subject-matter search there
+would mean fetching and indexing 84,130 decisions locally — far beyond the
+scope of a per-container cache. Full-text search therefore runs against Open
+Legal Data, with the official source used to verify and read what it finds.

@@ -12,6 +12,7 @@ import { tabularRouter } from "./routes/tabular";
 import { workflowsRouter } from "./routes/workflows";
 import { userRouter } from "./routes/user";
 import { configRouter } from "./routes/config";
+import { warmOfficialDecisionIndex } from "./lib/officialDecisions";
 import { downloadsRouter } from "./routes/downloads";
 
 const app = express();
@@ -162,4 +163,8 @@ process.on("uncaughtException", (err) => {
 
 app.listen(PORT, () => {
   console.log(`Mike backend running on port ${PORT}`);
+  // Build the federal-courts index in the background so the first lookup in a
+  // chat does not pay for the ~23 MB download. Failures are logged, not fatal:
+  // the tools rebuild on demand and report their own unavailability.
+  warmOfficialDecisionIndex();
 });
