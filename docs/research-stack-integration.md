@@ -1,9 +1,58 @@
 # Research stack: llama inference for OpenResearcher and Dexter
 
-Status: tested and planned on 2026-09-25. Nothing in the three Spaces has been
-changed yet.
+Status: **deployed and tested on 2026-09-25.** The "Deployed" section below
+records what changed in each Space and how it was verified. The measurements
+and the original plan follow it.
 
-## The three Spaces
+## Deployed
+
+| Space | Change | Commit |
+|---|---|---|
+| `Leon4gr45/llama` | Secret `API_KEY` set, so `/v1` now rejects requests without the key (401). The gateway defaults `chat_template_kwargs.enable_thinking=false`; callers can still turn it on. | [eac299b](https://huggingface.co/spaces/Leon4gr45/llama/commit/eac299baab9213151294226b2fce5d4cd14659ea) |
+| `Leon4gr45/openresearcher` | Inference goes to the llama Space (`OPENAI_*`, default mode "Cloud only", `MAX_NEW_TOKENS=1024`). Search tries SearXNG (`SEARXNG_BASE_URL`) first, with a relevance guard, then Jina. Other fixes: `n_ctx` is read from llama.cpp's `meta`; numeric-string link ids are accepted; GLM-style `<arg_key>` text tool calls are parsed; a final answer is forced when the round limit is hit; `mcp` is pinned `<2` (2.x removed `streamablehttp_client`, which would crash the next rebuild). New JSON API `research(question, max_rounds)`. | [f8d3fe9](https://huggingface.co/spaces/Leon4gr45/openresearcher/commit/f8d3fe9aa6aee610b7d050ac1cd77b5e372aa47e) |
+| `Leon4gr45/dexter` | `DEXTER_DEFAULT_MODEL=auto`, `DEXTER_FALLBACK_MODELS=auto,llama:spark-x2.5-1.7b`. Keyless `web_search` provider (SearXNG, then Jina MCP). New `openresearcher_deep_search` tool, also available to `research` subagents. New `llama:` provider with thinking off. New `public-opinion-study` skill. Empty replies are retried. **Root cause of the empty answers:** streamed tool calls from the gateway were not reassembled, so the reply is now re-requested without streaming. SSE keep-alive added (Bun's 255 s idle timeout was cutting slow runs). | [12c4c6c](https://huggingface.co/spaces/Leon4gr45/dexter/commit/12c4c6ce85a9f8e473cfe42f704eeff695b7c5ab), [7e5fa12](https://huggingface.co/spaces/Leon4gr45/dexter/commit/7e5fa126ef3dd235252d08ec02f2135291159f33) |
+
+Verified live:
+
+- llama: `/v1/models` returns 401 without the key and 200 with it. A plain
+  request with no extra fields answers in 4.6 s without reasoning.
+- OpenResearcher: `/gradio_api/call/research` returns
+  `{answer, sources, rounds, status, error}`. A 6-round job cited a real
+  Reddit thread and listed four Reddit threads as sources (886 s while it
+  shared the llama slot with another job).
+- Dexter: the question that returned an empty answer three times now runs
+  `web_search`, returns citations and a full answer in 12 s.
+
+Using it:
+
+```bash
+# Dexter (orchestrator); the skill triggers on public-opinion questions
+curl -N -X POST https://leon4gr45-dexter.hf.space/dexter-api/v1/query \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"human","content":"Run a public opinion study on ..."}],"depth":"deep"}'
+
+# OpenResearcher (one deep-search job)
+curl -X POST https://leon4gr45-openresearcher.hf.space/gradio_api/call/research \
+  -H 'Content-Type: application/json' -d '{"data":["<question>", 20]}'
+# -> {"event_id": "..."}; then GET .../gradio_api/call/research/<event_id> (SSE)
+```
+
+Known limits:
+
+- **SearXNG** (`cjj-on-hf-searxng.hf.space`) currently yields nothing
+  usable: Brave is rate-limited, DuckDuckGo and Startpage show CAPTCHAs, and
+  Bing returns results unrelated to the query. Every search therefore falls
+  back to Jina today. It switches over automatically once the instance
+  returns relevant results. `SEARXNG_ENGINES` can restrict the engine list.
+- **Reddit** often answers direct fetches with "Prove your humanity". Jina
+  `read_url` gets through more often.
+- **llama** has one slot: concurrent jobs queue. A 1.7B model gives thin
+  answers, so keep it for workers and let Dexter's `auto` model lead.
+- `web_fetch` in Dexter summarises pages with the provider's `fastModel`
+  (`gpt-5.4-mini`). If freellmapi does not serve it, those calls fail. Not
+  yet observed; check if `web_fetch` errors appear.
+
+## The three Spaces (before the changes)
 
 | Space | Role | State when tested |
 |---|---|---|
@@ -71,7 +120,7 @@ What this means:
 - **llama** handles cheap bulk work: coding thousands of posts, extracting
   quotes, and summarising pages for OpenResearcher, with no API cost.
 
-## Integration steps
+## Integration steps (original plan, now done except where noted)
 
 ### llama Space
 1. Set the secret `API_KEY` so `/v1` requires a key.
