@@ -126,27 +126,56 @@ app.use("/download", downloadsRouter);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
+// Kept in step with the routers mounted above. On the Hugging Face Space every
+// path below is served under the `/api` prefix (nginx strips it before it
+// reaches this process); `/health` and `/api-docs` are also served unprefixed.
 app.get("/api-docs", (_req, res) => {
   res.json({
     title: "Mike API Documentation",
-    version: "1.0.0",
+    version: "1.1.0",
+    base_url: "/api",
+    auth: "none — every request runs as the single built-in local user",
     endpoints: [
       { path: "/health", method: "GET", purpose: "Health check endpoint returning { ok: true }" },
-      { path: "/chat", method: "GET/POST/PATCH/DELETE", purpose: "Manage chats and run inference" },
-      { path: "/projects", method: "GET/POST/PATCH/DELETE", purpose: "Manage projects" },
-      { path: "/projects/:projectId/chat", method: "GET/POST", purpose: "Project-specific chat" },
-      { path: "/projects/:projectId/documents", method: "POST", purpose: "Upload document to project" },
-      { path: "/single-documents", method: "GET/POST/PATCH/DELETE", purpose: "Manage documents" },
-      { path: "/single-documents/:documentId/versions", method: "GET/POST", purpose: "Manage document versions" },
-      { path: "/tabular-review", method: "GET/POST/PATCH/DELETE", purpose: "Manage tabular reviews" },
-      { path: "/tabular-review/:reviewId/generate", method: "POST", purpose: "Run tabular generation" },
-      { path: "/tabular-review/:reviewId/chat", method: "POST", purpose: "Chat about tabular review" },
-      { path: "/workflows", method: "GET/POST/PATCH/DELETE", purpose: "Manage workflows" },
-      { path: "/user", method: "GET/PATCH", purpose: "Manage user profile" },
-      { path: "/user/api-keys", method: "GET/PUT", purpose: "Manage API keys" },
-      { path: "/users", method: "GET/PATCH", purpose: "Alias for /user" },
-      { path: "/download", method: "GET", purpose: "Download documents" },
-      { path: "/api-docs", method: "GET", purpose: "API Documentation" },
+      { path: "/config", method: "GET", purpose: "Enabled providers and the model ids accepted by `model`" },
+      {
+        path: "/chat",
+        method: "POST",
+        purpose: "Run a chat turn with the research tools; streams Server-Sent Events",
+        request: {
+          messages: "[{ role: 'user' | 'assistant', content: string }] (required, non-empty)",
+          chat_id: "string (optional) — continue an existing chat",
+          project_id: "string (optional) — give the model the project's documents",
+          model: "string (optional) — one of GET /config models[].id",
+        },
+        response:
+          "text/event-stream of `data: {json}` lines ending with `data: [DONE]`. " +
+          "Event types include chat_id, content_delta (answer text), reasoning_delta, " +
+          "tool_call_start, citations, doc_* and error.",
+      },
+      { path: "/chat", method: "GET", purpose: "List chats (?limit=1..100)" },
+      { path: "/chat/create", method: "POST", purpose: "Create an empty chat, optionally in a project" },
+      { path: "/chat/:chatId", method: "GET/PATCH/DELETE", purpose: "Read (with messages), rename or delete a chat" },
+      { path: "/chat/:chatId/generate-title", method: "POST", purpose: "Generate a chat title" },
+      { path: "/projects", method: "GET/POST", purpose: "List or create projects" },
+      { path: "/projects/:projectId", method: "GET/PATCH/DELETE", purpose: "Read, update or delete a project" },
+      { path: "/projects/:projectId/documents", method: "GET/POST", purpose: "List or upload (multipart `file`) project documents" },
+      { path: "/projects/:projectId/chats", method: "GET", purpose: "List a project's chats" },
+      { path: "/projects/:projectId/chat", method: "POST", purpose: "Project chat; same body and stream as POST /chat" },
+      { path: "/single-documents", method: "GET/POST", purpose: "List or upload (multipart `file`: pdf, docx, doc) standalone documents" },
+      { path: "/single-documents/:documentId", method: "DELETE", purpose: "Delete a document" },
+      { path: "/single-documents/:documentId/versions", method: "GET/POST", purpose: "List or upload document versions" },
+      { path: "/tabular-review", method: "GET/POST", purpose: "List or create tabular reviews" },
+      { path: "/tabular-review/:reviewId", method: "GET/PATCH/DELETE", purpose: "Read, update or delete a tabular review" },
+      { path: "/tabular-review/:reviewId/generate", method: "POST", purpose: "Run tabular generation (streams)" },
+      { path: "/tabular-review/:reviewId/chat", method: "POST", purpose: "Chat about a tabular review (streams)" },
+      { path: "/workflows", method: "GET/POST", purpose: "List or create workflows" },
+      { path: "/workflows/:workflowId", method: "GET/PUT/PATCH/DELETE", purpose: "Read, update or delete a workflow" },
+      { path: "/user/profile", method: "GET/PATCH", purpose: "Read or update the user profile and API-key status" },
+      { path: "/user/api-keys", method: "GET", purpose: "Which provider keys are configured" },
+      { path: "/user/api-keys/:provider", method: "PUT", purpose: "Store a provider API key" },
+      { path: "/download/:token", method: "GET", purpose: "Download a generated file" },
+      { path: "/api-docs", method: "GET", purpose: "This document" },
     ],
   });
 });

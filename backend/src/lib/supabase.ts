@@ -86,6 +86,25 @@ class QueryBuilder {
     return this;
   }
 
+  // PostgREST `is` only takes null/true/false; a missing field counts as null.
+  is(col: string, val: any) {
+    this.filters.push((item) => item && (item[col] ?? null) === val);
+    return this;
+  }
+
+  // Only the operators the routes use are supported. An unknown one is
+  // rejected loudly rather than silently matching everything.
+  not(col: string, op: string, val: any) {
+    if (op === "is") {
+      this.filters.push((item) => item && (item[col] ?? null) !== val);
+    } else if (op === "eq") {
+      this.filters.push((item) => item && item[col] !== val);
+    } else {
+      throw new Error(`Unsupported not() operator: ${op}`);
+    }
+    return this;
+  }
+
   contains(col: string, val: any) {
     const checkArray = Array.isArray(val) ? val : [val];
     this.filters.push((item) => {
