@@ -74,6 +74,28 @@ Validation of attempt 3 with `dexter/scripts/validate-report.ts`:
   of coded sources, and a source URL for every poll or statistic
   ([c4f8c95](https://huggingface.co/spaces/Leon4gr45/dexter/commit/c4f8c959937da6a9e9039b4f02232ff1cf32fb7e)).
 
+Confirmation run with the stricter skill (64 min: 6 `reddit_search`,
+7 `web_fetch`, 4 `web_search`, 2 OpenResearcher jobs):
+
+- **Stance** is now a table of coded-source counts (5 against, 3 mixed,
+  0 for), not invented percentages.
+- **Poll claim** now cites an opened Infratest dimap page. Its figures
+  (16 % own, 40 % could imagine, 42 % reject) match the page exactly, but the
+  stated field period "July–Aug 2023" does not appear on it.
+- **URLs:** 9, all from tools, all reachable.
+- **Quotes:** 6 of 7 verbatim at the cited URL (Reddit comments and post
+  bodies, a Bluesky post). One ("Ein Deutschlandticket kostet 63,00 €…") is
+  misattributed: the cited Spiegel Bluesky post is about something else, so
+  the text likely came from a search snippet.
+- The report is more cautious: 8 coded sources compared with 19 quotes
+  before. One `reddit_search` still failed on the archive's rate limit after
+  all retries, and was reported as a warning.
+- **Fix:** the skill now forbids quoting or taking dates and figures from
+  `web_search` snippets; only text a tool returned for the opened page counts
+  ([Dexter Space commits](https://huggingface.co/spaces/Leon4gr45/dexter/commits/main)).
+  The validator now also reads Reddit post titles and bodies and skips
+  logged search queries.
+
 **Tiers:** OpenResearcher's research API takes `tier` (`small` = llama,
 `auto` = the `AUTO_BASE_URL`/`AUTO_MODEL`/`AUTO_API_KEY` backend). Dexter's
 tool and skill use `auto` only for the sub-questions the findings depend on.
