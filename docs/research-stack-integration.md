@@ -46,6 +46,41 @@ Improvements for real studies:
 - For key sub-questions, consider pointing OpenResearcher at `auto` instead
   of llama. It would be faster and better, but no longer free.
 
+### Validation round (2026-09-26): Deutschlandticket study
+
+A new topic, to check the workflow is not tuned to the heat-pump example.
+Each attempt exposed a defect, fixed before the next:
+
+| Attempt | Outcome | Fix |
+|---|---|---|
+| 1 (`depth: deep`) | Hit the 20-step limit; answer was only "Reached maximum iterations". Several `web_fetch`/`browser` calls "finished" instantly | `depth: "study"` = 60 steps; at any step limit Dexter writes the best answer from what it gathered; tool errors inside results are now reported as WARNING events |
+| (diagnosis) | The warnings showed Reddit answering `web_fetch` with 403; `browser` and Jina `read_url` get the "Prove your humanity" wall; PullPush refuses agents (429) | New keyless **`reddit_search`** tool via the Arctic Shift archive (posts by title, top comments of a thread, keyword comment search; no usernames). OpenResearcher's `open` reads Reddit threads the same way. The archive rate-limits hard (422 "Timeout. Maybe slow down a bit"), so the tool paces requests 3 s apart and backs off 10/30/60 s |
+| 2 | Stopped after 21 s with only the "Round 0: Scope" text: the phrase-matching guard missed it | Headless runs now end only on an explicit `[[FINAL]]` marker (stripped from the answer); a reply without tools and without it gets "continue" (max 3) |
+| 3 | **Complete in 25 min:** 11 `reddit_search` calls, web search and fetch, one OpenResearcher job (14 min), fieldnotes in memory; report with 5 themes and 19 quotes | See validation below |
+
+Validation of attempt 3 with `dexter/scripts/validate-report.ts`:
+
+- **URLs:** 16 in the report, all 16 returned by tools (none invented), all
+  16 reachable.
+- **Quotes:** 15 of 19 found verbatim at the exact URL cited, mostly
+  comment-level Reddit permalinks. 2 were real ZDF statements wrapped in the
+  report's own framing ("beschrieb … als"); 1 real comment had "Man kann"
+  changed to "Ich kann"; 1 (SWR) had no URL, which the report disclosed.
+  **No fabricated quotes.**
+- **Unsourced claims:** the stance percentages (60/25/15 %), a poll
+  comparison ("Infratest dimap, YouGov…") and a ridership claim had no
+  opened source behind them.
+- **Fix:** the skill now requires character-exact quotes, stance as counts
+  of coded sources, and a source URL for every poll or statistic
+  ([c4f8c95](https://huggingface.co/spaces/Leon4gr45/dexter/commit/c4f8c959937da6a9e9039b4f02232ff1cf32fb7e)).
+
+**Tiers:** OpenResearcher's research API takes `tier` (`small` = llama,
+`auto` = the `AUTO_BASE_URL`/`AUTO_MODEL`/`AUTO_API_KEY` backend). Dexter's
+tool and skill use `auto` only for the sub-questions the findings depend on.
+`AUTO_*` is **not configured yet**: the freellmapi URL and key are Dexter
+secrets and cannot be read back, so `auto` jobs currently fall back to
+`small`. The result's `tier` field reports which model actually ran.
+
 Verified live:
 
 - llama: `/v1/models` returns 401 without the key and 200 with it. A plain
