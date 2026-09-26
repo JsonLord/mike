@@ -36,7 +36,15 @@ Full-pipeline test (one-round study, one OpenResearcher job with
 | 1 | Tools ran (web_search, skill, OpenResearcher 18 min), 14 sources, but the final message asked "how would you like to proceed?" |
 | 2 | Ended after 2 s with a narrated plan and no tool calls |
 | 3 (autoContinue) | Complete: skill, memory, web_search, OpenResearcher (28 min), browser, web_fetch; report with 38 sources (r/de, Spiegel, FAZ, Tagesschau, ZDF, DLF, YouTube). The report noted "tooling errors": `web_fetch` was failing on `gpt-5.4-mini`. |
-| 4 (fast model fixed) | See below |
+| 4 | Cut off at 259 s: the Space restarted mid-run because a variable change and a code push each triggered a restart. Deployment artefact, not a pipeline fault. |
+| 5 (all fixes) | **Complete in 14.5 min, no errors:** skill, web_search, one OpenResearcher job (13 min on llama), memory update, report in the skill's six sections, 11 citations. The report is honest but **thin**: its findings rest on one English-language Reddit thread (r/LinusTechTips), because the prompt limited it to one round and one sub-question, and the 1.7B deep search surfaced little. It listed three more Reddit threads as "identified but not opened". |
+
+Improvements for real studies:
+- Run 3–6 rounds, not one. The skill's saturation check needs several.
+- Let Dexter `web_fetch` the threads OpenResearcher only lists (this works
+  now) instead of relying on its summary.
+- For key sub-questions, consider pointing OpenResearcher at `auto` instead
+  of llama. It would be faster and better, but no longer free.
 
 Verified live:
 
