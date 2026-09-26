@@ -36,7 +36,7 @@ Full-pipeline test (one-round study, one OpenResearcher job with
 | 1 | Tools ran (web_search, skill, OpenResearcher 18 min), 14 sources, but the final message asked "how would you like to proceed?" |
 | 2 | Ended after 2 s with a narrated plan and no tool calls |
 | 3 (autoContinue) | Complete: skill, memory, web_search, OpenResearcher (28 min), browser, web_fetch; report with 38 sources (r/de, Spiegel, FAZ, Tagesschau, ZDF, DLF, YouTube). The report noted "tooling errors": `web_fetch` was failing on `gpt-5.4-mini`. |
-| 4 | Cut off at 259 s: the Space restarted mid-run because a variable change and a code push each triggered a restart. Deployment artefact, not a pipeline fault. |
+| 4 | Stream closed at 259 s, during the OpenResearcher job, with no answer. The Space logs show nothing at that moment: no restart (the only one was at 00:07:41, before the run), no process exit, no proxy error. Most likely the connection dropped between client and Space. Did not recur in run 5. |
 | 5 (all fixes) | **Complete in 14.5 min, no errors:** skill, web_search, one OpenResearcher job (13 min on llama), memory update, report in the skill's six sections, 11 citations. The report is honest but **thin**: its findings rest on one English-language Reddit thread (r/LinusTechTips), because the prompt limited it to one round and one sub-question, and the 1.7B deep search surfaced little. It listed three more Reddit threads as "identified but not opened". |
 
 Improvements for real studies:
@@ -82,6 +82,11 @@ Known limits:
   `read_url` gets through more often.
 - **llama** has one slot: concurrent jobs queue. A 1.7B model gives thin
   answers, so keep it for workers and let Dexter's `auto` model lead.
+- `/dexter-api/v1/query` has no authentication, and every call spends the
+  freellmapi key. An automated scanner probed the Space on 2026-09-26
+  (`/.env`, `/.streamlit/secrets.toml`, `/file=../.env`, `/openapi.json`).
+  All returned 404 except `openapi.json`. Consider a shared-secret check on
+  `/dexter-api/*` in the FastAPI proxy.
 - An OpenResearcher job with `max_rounds` 6 takes 18–28 minutes on the CPU
   model. Studies with several deep-search jobs run for hours, and parallel
   jobs queue behind the single llama slot.
