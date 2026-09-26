@@ -445,9 +445,9 @@ export function DisplayWorkflowModal({ workflows, workflow, onClose }: Props) {
     // Render
     // ---------------------------------------------------------------------------
     return createPortal(
-        <div className="fixed inset-0 z-[101] flex items-center justify-center bg-black/20 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[101] flex items-center justify-center bg-black/20 backdrop-blur-xs p-4">
             <div
-                className={`w-full rounded-2xl bg-white shadow-2xl flex flex-col h-[600px] transition-all duration-200 ${screen === "select" ? "max-w-4xl" : "max-w-2xl"}`}
+                className={`w-full rounded-2xl bg-white shadow-2xl flex flex-col h-[min(600px,85vh)] transition-all duration-200 ${screen === "select" ? "max-w-[min(56rem,92vw)]" : "max-w-[min(42rem,92vw)]"}`}
             >
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 shrink-0">

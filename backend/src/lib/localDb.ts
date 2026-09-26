@@ -31,13 +31,17 @@ export class LocalDb {
     private async init() {
         if (this.initialized) return;
         await this.ensureDir(DATA_DIR);
-        await this.ensureDir(path.join(DATA_DIR, "projects"));
-        await this.ensureDir(path.join(DATA_DIR, "documents"));
-        await this.ensureDir(path.join(DATA_DIR, "chats"));
-        await this.ensureDir(path.join(DATA_DIR, "messages"));
-        await this.ensureDir(path.join(DATA_DIR, "workflows"));
-        await this.ensureDir(path.join(DATA_DIR, "user_profiles"));
         this.initialized = true;
+    }
+
+    /**
+     * Collections are created on first write. The set of tables grows with the
+     * schema, so deriving the directory from the collection name keeps a write
+     * to a new table from failing with ENOENT.
+     */
+    private async ensureCollection(collection: string) {
+        await this.init();
+        await this.ensureDir(path.join(DATA_DIR, collection));
     }
 
     private getPath(collection: string, id: string): string {
@@ -77,7 +81,7 @@ export class LocalDb {
     }
 
     public async upsert<T extends { id: string }>(collection: string, item: T): Promise<T> {
-        await this.init();
+        await this.ensureCollection(collection);
         const filePath = this.getPath(collection, item.id);
         await fs.writeFile(filePath, JSON.stringify(item, null, 2), "utf-8");
         debouncedSync();

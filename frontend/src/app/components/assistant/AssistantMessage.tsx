@@ -28,6 +28,14 @@ function toolCallLabel(name: string): string {
     if (name === "read_workflow") return "Loading workflow...";
     if (name === "list_workflows") return "Loading workflows...";
     if (name === "list_documents") return "Loading documents...";
+    if (name === "search_case_law") return "Searching case law...";
+    if (name === "fetch_case") return "Reading decision...";
+    if (name === "search_statutes") return "Searching statutes...";
+    if (name === "fetch_statute") return "Reading statute...";
+    if (name === "search_official_decisions")
+        return "Searching official decisions...";
+    if (name === "fetch_official_decision")
+        return "Reading official decision...";
     return name ? `Running ${name}...` : "Working...";
 }
 

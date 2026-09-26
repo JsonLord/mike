@@ -2,6 +2,10 @@
 // @ts-nocheck
 // @ts-nocheck
 import type { Provider } from "./types";
+import {
+    isOpenAiCompatibleEnabled,
+    openAiCompatibleModelId,
+} from "./openaiCompatible";
 
 // ---------------------------------------------------------------------------
 // Canonical model IDs
@@ -46,6 +50,7 @@ const ALL_MODELS = new Set<string>([
 // ---------------------------------------------------------------------------
 
 export function providerForModel(model: string): Provider {
+    if (model === openAiCompatibleModelId()) return "openai";
     if (model.startsWith("claude")) return "claude";
     if (model.startsWith("gemini")) return "gemini";
     if (model.startsWith("gpt-")) return "openai";
@@ -53,6 +58,26 @@ export function providerForModel(model: string): Provider {
 }
 
 export function resolveModel(id: string | null | undefined, fallback: string): string {
-    if (id && ALL_MODELS.has(id)) return id;
+    if (id && (ALL_MODELS.has(id) || id === openAiCompatibleModelId())) return id;
     return fallback;
 }
+
+// ---------------------------------------------------------------------------
+// Defaults
+// ---------------------------------------------------------------------------
+// A server-configured OpenAI-compatible endpoint is the only model that
+// deployment can actually serve, so it becomes the default for every tier.
+
+export function defaultMainModel(): string {
+    return openAiCompatibleModelId() ?? DEFAULT_MAIN_MODEL;
+}
+
+export function defaultTitleModel(): string {
+    return openAiCompatibleModelId() ?? DEFAULT_TITLE_MODEL;
+}
+
+export function defaultTabularModel(): string {
+    return openAiCompatibleModelId() ?? DEFAULT_TABULAR_MODEL;
+}
+
+export { isOpenAiCompatibleEnabled, openAiCompatibleModelId };

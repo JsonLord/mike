@@ -137,6 +137,16 @@ export type ApiKeyStatus = Record<ApiKeyProvider, boolean> & {
     sources?: Partial<Record<ApiKeyProvider, ApiKeySource>>;
 };
 
+export interface ServerConfig {
+    openaiCompatible: { enabled: boolean; model: string | null };
+    models: { id: string; label: string; group: "Anthropic" | "Google" | "OpenAI" }[];
+}
+
+/** Public, non-sensitive server configuration (extra models, provider flags). */
+export async function getServerConfig(): Promise<ServerConfig> {
+    return apiRequest<ServerConfig>("/config");
+}
+
 export async function getApiKeyStatus(): Promise<ApiKeyStatus> {
     return apiRequest<ApiKeyStatus>("/user/api-keys");
 }

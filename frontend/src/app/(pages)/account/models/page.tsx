@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useUserProfile } from "@/contexts/UserProfileContext";
 import type { ApiKeyState } from "@/app/lib/mikeApi";
-import { MODELS } from "@/app/components/assistant/ModelToggle";
+import { useAllModels } from "@/app/lib/runtimeModels";
 import {
     isModelAvailable,
     modelGroupToProvider,
@@ -130,7 +130,8 @@ function TabularModelDropdown({
     apiKeys?: ApiKeyState;
 }) {
     const [isOpen, setIsOpen] = useState(false);
-    const selected = MODELS.find((m) => m.id === value);
+    const models = useAllModels();
+    const selected = models.find((m) => m.id === value);
     const selectedAvailable = apiKeys ? isModelAvailable(value, apiKeys) : true;
     const groups: ("Anthropic" | "Google" | "OpenAI")[] = [
         "Anthropic",
@@ -164,7 +165,7 @@ function TabularModelDropdown({
                 align="start"
             >
                 {groups.map((group, gi) => {
-                    const items = MODELS.filter((m) => m.group === group);
+                    const items = models.filter((m) => m.group === group);
                     if (items.length === 0) return null;
                     return (
                         <div key={group}>
