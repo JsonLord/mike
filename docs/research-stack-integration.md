@@ -12,6 +12,32 @@ and the original plan follow it.
 | `Leon4gr45/openresearcher` | Inference goes to the llama Space (`OPENAI_*`, default mode "Cloud only", `MAX_NEW_TOKENS=1024`). Search tries SearXNG (`SEARXNG_BASE_URL`) first, with a relevance guard, then Jina. Other fixes: `n_ctx` is read from llama.cpp's `meta`; numeric-string link ids are accepted; GLM-style `<arg_key>` text tool calls are parsed; a final answer is forced when the round limit is hit; `mcp` is pinned `<2` (2.x removed `streamablehttp_client`, which would crash the next rebuild). New JSON API `research(question, max_rounds)`. | [f8d3fe9](https://huggingface.co/spaces/Leon4gr45/openresearcher/commit/f8d3fe9aa6aee610b7d050ac1cd77b5e372aa47e) |
 | `Leon4gr45/dexter` | `DEXTER_DEFAULT_MODEL=auto`, `DEXTER_FALLBACK_MODELS=auto,llama:spark-x2.5-1.7b`. Keyless `web_search` provider (SearXNG, then Jina MCP). New `openresearcher_deep_search` tool, also available to `research` subagents. New `llama:` provider with thinking off. New `public-opinion-study` skill. Empty replies are retried. **Root cause of the empty answers:** streamed tool calls from the gateway were not reassembled, so the reply is now re-requested without streaming. SSE keep-alive added (Bun's 255 s idle timeout was cutting slow runs). | [12c4c6c](https://huggingface.co/spaces/Leon4gr45/dexter/commit/12c4c6ce85a9f8e473cfe42f704eeff695b7c5ab), [7e5fa12](https://huggingface.co/spaces/Leon4gr45/dexter/commit/7e5fa126ef3dd235252d08ec02f2135291159f33) |
 
+### Hybrid model split (follow-up)
+
+- **Dexter (orchestrator):** `auto` from freellmapi only.
+  `DEXTER_FALLBACK_MODELS=auto`, so it never falls back to the 1.7B model.
+  `DEXTER_FAST_MODEL=auto`, because the built-in `gpt-5.4-mini` is not in
+  freellmapi's catalog, so every `web_fetch` failed with a 400.
+- **OpenResearcher (research jobs):** the llama Space (`spark-x2.5-1.7b`).
+- **Headless runs:** `/v1/query` sets `autoContinue`. When a reply without
+  tool calls only announces a plan or asks how to proceed, the agent is told
+  to continue (at most twice). The `auto` router produced both kinds of
+  reply in testing.
+
+Commits: [3fe7bec](https://huggingface.co/spaces/Leon4gr45/dexter/commit/3fe7bec18c883e6e05fcdb2b12bbc67c52e8442b),
+[d51c262](https://huggingface.co/spaces/Leon4gr45/dexter/commit/d51c2624aa0aded886ab1c8359e78865cad96447),
+[9fbcb19](https://huggingface.co/spaces/Leon4gr45/dexter/commit/9fbcb1938f5b013ea924a07aea1da1574ffad855).
+
+Full-pipeline test (one-round study, one OpenResearcher job with
+`max_rounds` 6):
+
+| Run | Outcome |
+|---|---|
+| 1 | Tools ran (web_search, skill, OpenResearcher 18 min), 14 sources, but the final message asked "how would you like to proceed?" |
+| 2 | Ended after 2 s with a narrated plan and no tool calls |
+| 3 (autoContinue) | Complete: skill, memory, web_search, OpenResearcher (28 min), browser, web_fetch; report with 38 sources (r/de, Spiegel, FAZ, Tagesschau, ZDF, DLF, YouTube). The report noted "tooling errors": `web_fetch` was failing on `gpt-5.4-mini`. |
+| 4 (fast model fixed) | See below |
+
 Verified live:
 
 - llama: `/v1/models` returns 401 without the key and 200 with it. A plain
@@ -48,9 +74,9 @@ Known limits:
   `read_url` gets through more often.
 - **llama** has one slot: concurrent jobs queue. A 1.7B model gives thin
   answers, so keep it for workers and let Dexter's `auto` model lead.
-- `web_fetch` in Dexter summarises pages with the provider's `fastModel`
-  (`gpt-5.4-mini`). If freellmapi does not serve it, those calls fail. Not
-  yet observed; check if `web_fetch` errors appear.
+- An OpenResearcher job with `max_rounds` 6 takes 18–28 minutes on the CPU
+  model. Studies with several deep-search jobs run for hours, and parallel
+  jobs queue behind the single llama slot.
 
 ## The three Spaces (before the changes)
 
